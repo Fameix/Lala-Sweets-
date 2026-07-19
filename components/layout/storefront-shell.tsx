@@ -15,6 +15,7 @@ const primaryLinks = [
   { href: "/cakes", label: "Cakes" },
   { href: "/sweets", label: "Sweets" },
   { href: "/custom-cake", label: "Custom Cakes" },
+  { href: "/ai-assistant", label: "AI Assistant" },
   { href: "/offers", label: "Offers" },
 ]
 

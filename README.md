@@ -2,6 +2,20 @@
 
 Production-oriented Next.js App Router build for Master Bakery, Sivagangai, Tamil Nadu.
 
+## AI customer experience
+
+The app includes safe fallback implementations for cake serving calculation, Master AI Assistant, custom cake requirement summaries, and Tamil/English voice transcript review.
+
+Useful routes:
+
+- `/cake-serving-calculator`
+- `/ai-assistant`
+- `/custom-cake`
+- `/admin/settings/cake-serving-rules`
+- `/admin/ai-settings`
+
+Optional AI provider variables are documented in `.env.example`; the app builds and runs without them.
+
 ## Setup
 
 ```bash

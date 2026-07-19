@@ -7,6 +7,7 @@ import { ProductCard } from "@/components/commerce/product-card"
 import { StorefrontShell } from "@/components/layout/storefront-shell"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AIHomeSection } from "@/features/ai/components/ai-home-section"
 import { getCakeProducts, getCategories, getProducts } from "@/lib/catalogue"
 import { cn } from "@/lib/utils"
 
@@ -31,6 +32,8 @@ export default function HomePage() {
             />
           </div>
         </section>
+
+        <AIHomeSection />
 
         <section className="mx-auto max-w-6xl px-4 py-10">
           <div className="flex items-end justify-between gap-4">

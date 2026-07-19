@@ -70,6 +70,9 @@ export default async function CakesPage({
                   <Gift className="size-4" />
                   Customize a Cake
                 </Link>
+                <Link href="/cake-serving-calculator" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+                  How Much Cake Do I Need?
+                </Link>
               </div>
             </div>
             <Card>

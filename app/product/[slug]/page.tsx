@@ -128,6 +128,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             <Link href="/custom-cake" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
               Ask about customization
             </Link>
+            {isCake ? (
+              <Link href="/cake-serving-calculator" className={cn(buttonVariants({ variant: "outline", size: "lg" }))}>
+                How Much Cake Do I Need?
+              </Link>
+            ) : null}
           </div>
           <Card className="mt-8">
             <CardContent className="grid gap-3 pt-0 text-sm">

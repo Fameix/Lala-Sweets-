@@ -64,9 +64,8 @@ export function ProductQuickView({
     setCartQuantity(product.id, nextQuantity)
   }
 
-  const addAndOpenCart = () => {
+  const addToCart = () => {
     updateQuantity(1)
-    setOpen(true)
   }
 
   const addFromPopup = () => {
@@ -114,7 +113,7 @@ export function ProductQuickView({
             triggerClassName,
             "bg-chart-1 text-foreground hover:bg-chart-1/80"
           )}
-          onClick={addAndOpenCart}
+          onClick={addToCart}
           aria-label={`Add ${product.display_name}`}
         >
           Add+

@@ -178,6 +178,28 @@ export function getProductImage(product: Product): ProductImage {
     }
   }
 
+  if (product.slug === "sharjah-milkshake") {
+    return {
+      src: "/milkshake-sharjah.png",
+      alt: "Sharjah milkshake with whipped cream and nuts in a bakery setting",
+      status: "temporary",
+      credit: "Client-provided image",
+      sourceUrl: "/milkshake-sharjah.png",
+      className: "object-center",
+    }
+  }
+
+  if (product.slug === "sugar-cane") {
+    return {
+      src: "/milkshake-sugar-cane.png",
+      alt: "Sugarcane juice in a tall glass in a bakery setting",
+      status: "temporary",
+      credit: "Client-provided image",
+      sourceUrl: "/milkshake-sugar-cane.png",
+      className: "object-center",
+    }
+  }
+
   if (product.slug === "blackcurrant-ice-cream") {
     return {
       src: "/icecream-blackcurrant.png",
@@ -229,7 +251,7 @@ export function getProductImage(product: Product): ProductImage {
       status: "temporary",
       credit: "Client-provided image",
       sourceUrl: "/icecream-vanilla.png",
-      className: "!object-contain object-center bg-black p-8 sm:p-10",
+      className: "object-center",
     }
   }
 

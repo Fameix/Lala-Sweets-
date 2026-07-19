@@ -101,7 +101,7 @@ export function MenuCatalogue({
   return (
     <div className="mt-6 grid items-start gap-3 md:h-[calc(100svh-17rem)] md:grid-cols-[240px_1fr]">
       <aside className="h-fit rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-sm font-medium">Menu</h2>
+        <p className="text-sm font-medium">Menu</p>
         <div className="mt-5 grid gap-2 text-sm">
           {categories.map((category) => (
             <Link key={category.slug} href={`/category/${category.slug}`} className="text-muted-foreground hover:text-foreground">

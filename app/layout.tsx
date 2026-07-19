@@ -2,6 +2,7 @@ import { Geist_Mono, Outfit, Roboto } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AIAssistantLauncher } from "@/features/ai/components/ai-assistant-launcher"
 import { cn } from "@/lib/utils";
 
 const robotoHeading = Roboto({subsets:['latin'],variable:'--font-heading'});
@@ -30,7 +31,10 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", outfit.variable, robotoHeading.variable)}
     >
       <body className="bg-background text-foreground">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <AIAssistantLauncher />
+        </ThemeProvider>
       </body>
     </html>
   )
