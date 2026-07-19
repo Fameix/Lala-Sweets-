@@ -1,21 +1,46 @@
-# Next.js template
+# Master Bakery frontend
 
-This is a Next.js template with shadcn/ui.
+Production-oriented Next.js App Router build for Master Bakery, Sivagangai, Tamil Nadu.
 
-## Adding components
-
-To add components to your app, run the following command:
+## Setup
 
 ```bash
-npx shadcn@latest add button
+pnpm install
+pnpm dev
 ```
 
-This will place the ui components in the `components` directory.
+## Commands
 
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button";
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
 ```
+
+## Design System
+
+- shadcn preset: `b1iABXArHn`
+- style: `base-maia`
+- icon library: `lucide`
+- component base: `@base-ui/react`
+- audit: `docs/DESIGN_SYSTEM_AUDIT.md`
+
+## Environment
+
+Create local variables from `.env.example`. Do not commit real secrets.
+
+Admin routes fail closed unless `ADMIN_PREVIEW_ENABLED=true` is set for local preview.
+
+## Supabase
+
+Initial schema is in `db/migrations/0001_initial_schema.sql`. It includes catalogue, cart, order, payment, custom cake, admin content, and audit-log tables with initial RLS policies.
+
+## Razorpay
+
+Razorpay packages are installed, but payment confirmation is not active until server-side order creation, signature verification, and webhook idempotency are implemented.
+
+## Menu Import
+
+Extracted products live in `data/master-bakery-menu.json`. Missing prices are represented as `null`, never zero, and all extracted items are currently non-orderable.

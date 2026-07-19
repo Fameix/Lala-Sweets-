@@ -1,0 +1,38 @@
+"use client"
+
+import Link from "next/link"
+import { useEffect, useState } from "react"
+import { ShoppingCart } from "lucide-react"
+
+import { getCartItemCount, subscribeToCart } from "@/lib/cart-client"
+import { cn } from "@/lib/utils"
+
+export function HeaderCartLink() {
+  const [itemCount, setItemCount] = useState(0)
+
+  useEffect(() => {
+    const sync = () => setItemCount(getCartItemCount())
+
+    sync()
+    return subscribeToCart(sync)
+  }, [])
+
+  return (
+    <Link
+      href="/cart"
+      className={cn(
+        "inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      )}
+      aria-label={`Cart with ${itemCount} items`}
+    >
+      <span className="relative inline-flex size-6 items-center justify-center">
+        <ShoppingCart className="size-5" />
+        {itemCount > 0 ? (
+          <span className="absolute -right-2 -top-2 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+            {itemCount}
+          </span>
+        ) : null}
+      </span>
+    </Link>
+  )
+}

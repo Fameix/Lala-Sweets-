@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono, Outfit, Roboto } from "next/font/google"
+import { Geist_Mono, Outfit, Roboto } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -13,18 +13,23 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
+export const metadata = {
+  title: "Master Bakery",
+  description: "A shadcn-first Next.js storefront for a modern bakery brand.",
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html
+      <html
       lang="en"
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", outfit.variable, robotoHeading.variable)}
     >
-      <body>
+      <body className="bg-background text-foreground">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
