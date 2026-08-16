@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { getFavouriteIds, subscribeToFavourites } from "@/lib/favourites-client"
 import { cn } from "@/lib/utils"
 
-export function HeaderFavouriteLink() {
+export function HeaderFavouriteLink({ transparentHeader = false }: { transparentHeader?: boolean }) {
   const [favouriteCount, setFavouriteCount] = useState(0)
 
   useEffect(() => {
@@ -21,7 +21,11 @@ export function HeaderFavouriteLink() {
   return (
     <Link
       href="/account/favourites"
-      className={cn(buttonVariants({ variant: "outline", size: "icon-sm" }), "relative hidden sm:inline-flex")}
+      className={cn(
+        buttonVariants({ variant: "outline", size: "icon-sm" }),
+        "relative hidden sm:inline-flex",
+        transparentHeader && "border-[#5f2b12]/25 bg-[#fff7df]/20 text-[#3a170a] hover:bg-[#fff7df]/40"
+      )}
       aria-label={`Wishlist with ${favouriteCount} items`}
     >
       <Heart className={cn("size-4", favouriteCount > 0 && "fill-primary text-primary")} />

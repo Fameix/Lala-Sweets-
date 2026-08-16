@@ -1,7 +1,7 @@
 "use client"
 
-const STORAGE_KEY = "master-bakery-favourites"
-const CHANGE_EVENT = "master-bakery-favourites-change"
+const STORAGE_KEY = "lala-sweets-favourites"
+const CHANGE_EVENT = "lala-sweets-favourites-change"
 
 function readFavouriteIds() {
   if (typeof window === "undefined") {

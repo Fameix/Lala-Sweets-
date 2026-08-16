@@ -7,7 +7,7 @@ import { ShoppingCart } from "lucide-react"
 import { getCartItemCount, subscribeToCart } from "@/lib/cart-client"
 import { cn } from "@/lib/utils"
 
-export function HeaderCartLink() {
+export function HeaderCartLink({ transparentHeader = false }: { transparentHeader?: boolean }) {
   const [itemCount, setItemCount] = useState(0)
 
   useEffect(() => {
@@ -21,7 +21,8 @@ export function HeaderCartLink() {
     <Link
       href="/cart"
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        "inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        transparentHeader && "text-[#3a170a] hover:bg-[#5f2b12]/10"
       )}
       aria-label={`Cart with ${itemCount} items`}
     >

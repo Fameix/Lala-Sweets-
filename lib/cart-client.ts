@@ -1,19 +1,25 @@
 "use client"
 
-const cartStorageKey = "master-bakery-cart-quantities"
-const cartChangedEvent = "master-bakery-cart-changed"
+const cartStorageKey = "lala-sweets-cart-quantities"
+const cartChangedEvent = "lala-sweets-cart-changed"
 
 type CartQuantities = Record<string, number>
 export type CartOptionSelections = Record<string, string[]>
 export type CartLineItem = {
+  id: string
   productId: string
+  productName?: string
+  productSlug?: string
+  image?: string
+  size: string
+  unitPricePaise: number
   quantity: number
   selectedOptions: CartOptionSelections
 }
 
 type CartOptionStorage = Record<string, CartOptionSelections>
 
-const cartOptionsStorageKey = "master-bakery-cart-options"
+const cartOptionsStorageKey = "lala-sweets-cart-options"
 
 function readCartQuantities(): CartQuantities {
   if (typeof window === "undefined") {
@@ -75,6 +81,52 @@ export function setCartItemOptions(productId: string, selectedOptions: CartOptio
   writeCartOptions(options)
 }
 
+function createCartLineId(productId: string, size: string) {
+  return `${productId}::${size}`
+}
+
+export function addCartItem({
+  productId,
+  productName,
+  productSlug,
+  image,
+  size,
+  unitPricePaise,
+  quantity,
+}: {
+  productId: string
+  productName: string
+  productSlug: string
+  image?: string
+  size: string
+  unitPricePaise: number
+  quantity: number
+}) {
+  const lineId = createCartLineId(productId, size)
+  const quantities = readCartQuantities()
+  const options = readCartOptions()
+
+  quantities[lineId] = (quantities[lineId] ?? 0) + Math.max(1, quantity)
+  options[lineId] = {
+    Size: [size],
+    Product: [productName],
+    Slug: [productSlug],
+    Image: image ? [image] : [],
+    "Unit price": [String(unitPricePaise)],
+  }
+
+  writeCartQuantities(quantities)
+  writeCartOptions(options)
+}
+
+export function setCartLineQuantity(lineId: string, quantity: number) {
+  setCartQuantity(lineId, quantity)
+}
+
+export function removeCartItem(lineId: string) {
+  setCartQuantity(lineId, 0)
+}
+
 export function getCartItemOptions(productId: string) {
   return readCartOptions()[productId] ?? {}
 }
@@ -83,15 +135,32 @@ export function getCartItems(): CartLineItem[] {
   const quantities = readCartQuantities()
   const options = readCartOptions()
 
-  return Object.entries(quantities).map(([productId, quantity]) => ({
-    productId,
-    quantity,
-    selectedOptions: options[productId] ?? {},
-  }))
+  return Object.entries(quantities).map(([lineId, quantity]) => {
+    const selectedOptions = options[lineId] ?? {}
+    const [productId, sizeFromLineId] = lineId.split("::")
+    const size = selectedOptions.Size?.[0] ?? sizeFromLineId ?? "250g"
+
+    return {
+      id: lineId,
+      productId,
+      productName: selectedOptions.Product?.[0],
+      productSlug: selectedOptions.Slug?.[0],
+      image: selectedOptions.Image?.[0],
+      size,
+      unitPricePaise: Number(selectedOptions["Unit price"]?.[0] ?? 0),
+      quantity,
+      selectedOptions,
+    }
+  })
 }
 
 export function getCartItemCount() {
   return Object.values(readCartQuantities()).reduce((total, quantity) => total + quantity, 0)
+}
+
+export function clearCart() {
+  writeCartQuantities({})
+  writeCartOptions({})
 }
 
 export function subscribeToCart(callback: () => void) {

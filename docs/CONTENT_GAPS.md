@@ -13,7 +13,7 @@
 
 ## Product Content
 
-- Product images: temporary Pexels placeholders; final Master Bakery-approved photos are still missing
+- Product images: temporary Pexels placeholders; final Lala Sweets-approved photos are still missing
 - Product prices: missing
 - Product variants: missing
 - Product sizes: missing

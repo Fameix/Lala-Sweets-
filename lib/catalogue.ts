@@ -1,65 +1,7 @@
-import menuData from "@/data/master-bakery-menu.json"
-import cakeData from "@/data/master-bakery-cakes.json"
+import { catalogueProducts } from "@/data/catalogue-products"
 import type { CategorySummary, Product } from "@/types/catalogue"
 
-type CakeSeed = {
-  sourceName: string
-  displayName: string
-  slug: string
-  productType: "cake"
-  category: string
-  subcategory: string
-  flavour: string
-  searchAliases: string[]
-  supportsPhotoUpload: boolean
-}
-
-const timestamp = "2026-07-19T00:00:00+05:30"
-
-const cakeProducts = (cakeData as CakeSeed[]).map((cake): Product => ({
-  id: `cake-${cake.slug}`,
-  source_name: cake.sourceName,
-  display_name: cake.displayName,
-  slug: cake.slug,
-  source_category: cake.subcategory,
-  normalized_category: cake.category,
-  short_description: "Proposed cake catalogue item awaiting Master Bakery review.",
-  long_description:
-    "This proposed cake product is editable in admin. Price, weights, egg options, preparation time, image, branch availability, and ordering rules must be configured before customers can order it.",
-  food_type: "unknown",
-  egg_status: "unconfigured",
-  allergen_information: [],
-  price_paise: null,
-  compare_at_price_paise: null,
-  price_status: "awaiting-client-price",
-  availability_status: "unconfirmed",
-  verification_status: "proposed-cake-product",
-  image_status: "missing",
-  source_asset: "proposed-cake-catalogue",
-  extraction_notes: "Proposed cake product requested for catalogue setup. No price, ingredient, eggless, or availability claims approved.",
-  preparation_minutes: null,
-  is_featured: false,
-  is_active: true,
-  is_orderable: false,
-  product_type: "cake",
-  subcategory: cake.subcategory,
-  flavour: cake.flavour,
-  supports_cake_message: true,
-  cake_message_max_length: 40,
-  supports_photo_upload: cake.supportsPhotoUpload,
-  available_weights: [],
-  cake_type_options: [],
-  shape_options: [],
-  occasion_tags: cake.searchAliases.filter((alias) => alias.includes("birthday") || alias.includes("anniversary") || alias.includes("wedding")),
-  addons: [],
-  same_day_available: false,
-  minimum_lead_minutes: null,
-  search_aliases: cake.searchAliases,
-  created_at: timestamp,
-  updated_at: timestamp,
-}))
-
-const products = [...(menuData.products as Product[]), ...cakeProducts]
+const products = catalogueProducts
 
 function categoryToSlug(category: string) {
   return category
@@ -122,8 +64,8 @@ export function searchProducts(query: string) {
   )
 }
 
-export function getCakeProducts() {
-  return getProducts().filter((product) => product.product_type === "cake")
+export function getCakeProducts(): Product[] {
+  return []
 }
 
 export function getCakeSubcategories() {
@@ -195,13 +137,15 @@ export function getNeedsReviewProducts() {
 }
 
 export function formatProductPrice(product: Product) {
-  if (product.price_paise === null) {
-    return "Price will be updated soon"
+  const pricePaise = product.price_paise ?? (product.price !== undefined ? product.price * 100 : null)
+
+  if (pricePaise === null) {
+    return "Price unavailable"
   }
 
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(product.price_paise / 100)
+  }).format(pricePaise / 100)
 }

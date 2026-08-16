@@ -12,14 +12,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import type { AIChatMessage } from "@/features/ai/types"
 
 const quickActions = [
-  "Find a cake",
-  "Calculate cake size",
+  "Find ghee halwa",
+  "Show traditional sweets",
   "Show products available today",
   "Find products within my budget",
   "Plan snacks for a group",
   "Check delivery availability",
   "Track my order",
-  "Create a custom cake request",
+  "Prepare an enquiry",
   "Speak my order",
 ]
 
@@ -28,7 +28,7 @@ export function AIAssistantPanel() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hi, I am Master AI Assistant. I can search the catalogue, estimate cake size, and prepare custom cake details. Cart changes always need your confirmation.",
+      content: "Hi, I am Lala AI Assistant. I can search the catalogue and help prepare an enquiry. Availability and order details should be confirmed with the shop.",
     },
   ])
   const [input, setInput] = useState("")
@@ -69,7 +69,7 @@ export function AIAssistantPanel() {
     <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 pb-6">
       <Alert>
         <Bot className="size-4" />
-        <AlertTitle>Master Bakery only</AlertTitle>
+        <AlertTitle>Lala Sweets only</AlertTitle>
         <AlertDescription>Voice and chat requests are reviewed before cart actions. The site still works when AI credentials are missing.</AlertDescription>
       </Alert>
       <div className="flex flex-wrap gap-2">
@@ -122,7 +122,7 @@ export function AIAssistantPanel() {
           send()
         }}
       >
-        <Input value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask for cakes, snacks, budget, delivery, or order help" />
+        <Input value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ask for halwa, sweets, savouries, or enquiry help" />
         <Button type="submit" size="icon" aria-label="Send message">
           <SendHorizontal className="size-4" />
         </Button>

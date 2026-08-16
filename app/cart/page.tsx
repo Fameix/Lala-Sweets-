@@ -10,7 +10,7 @@ export default function CartPage() {
       <main className="mx-auto max-w-4xl px-4 py-8">
         <h1 className="font-heading text-3xl font-medium">Cart</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Review selected products and options. Checkout stays paused until prices, availability, and branch rules are approved.
+          Review selected products, quantities, and delivery estimate before checkout.
         </p>
         <div className="mt-6">
           <CartContent products={products} />

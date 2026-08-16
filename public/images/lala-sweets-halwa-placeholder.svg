@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Tirunelveli ghee halwa placeholder</title>
+  <desc id="desc">Heritage styled placeholder illustration for halwa photography pending client approval.</desc>
+  <rect width="1200" height="900" fill="#fff7e8"/>
+  <rect x="80" y="80" width="1040" height="740" rx="24" fill="#6f1820"/>
+  <circle cx="600" cy="425" r="230" fill="#d4a03d" opacity=".18"/>
+  <ellipse cx="600" cy="560" rx="330" ry="86" fill="#3b2117" opacity=".2"/>
+  <path d="M320 420c85-80 195-126 326-111 109 13 197 62 253 128-54 85-153 145-272 153-133 9-246-42-307-170z" fill="#9b3f21"/>
+  <path d="M377 416c59-49 151-78 246-69 82 8 152 43 199 91-51 52-123 86-205 91-94 6-181-33-240-113z" fill="#c46d25"/>
+  <path d="M432 396c41-25 103-40 165-34 58 5 110 25 148 55-38 27-89 44-149 47-63 3-122-19-164-68z" fill="#e1a23c"/>
+  <text x="600" y="704" text-anchor="middle" font-family="Georgia, serif" font-size="44" fill="#fff7e8">Tirunelveli Ghee Halwa</text>
+  <text x="600" y="752" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#f7dca4">Product photography pending approval</text>
+</svg>

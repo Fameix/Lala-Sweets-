@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Traditional sweets placeholder</title>
+  <desc id="desc">Heritage styled placeholder illustration for sweets photography pending client approval.</desc>
+  <rect width="1200" height="900" fill="#fff7e8"/>
+  <rect x="80" y="80" width="1040" height="740" rx="24" fill="#5b141b"/>
+  <circle cx="440" cy="410" r="94" fill="#d99b28"/>
+  <circle cx="600" cy="385" r="94" fill="#f0bf55"/>
+  <circle cx="760" cy="410" r="94" fill="#d99b28"/>
+  <rect x="295" y="505" width="610" height="76" rx="38" fill="#f5d28a"/>
+  <text x="600" y="704" text-anchor="middle" font-family="Georgia, serif" font-size="44" fill="#fff7e8">Traditional Sweets</text>
+  <text x="600" y="752" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#f7dca4">Product photography pending approval</text>
+</svg>

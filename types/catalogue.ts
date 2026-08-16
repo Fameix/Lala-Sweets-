@@ -6,22 +6,38 @@ export type AvailabilityStatus = "unconfirmed" | "available" | "unavailable"
 
 export type ImageStatus = "missing" | "temporary" | "client-provided" | "approved"
 
+export type ProductSizeVariant = {
+  label: "250g" | "500g" | "1kg"
+  grams: number
+  price_paise: number
+  availability_status: AvailabilityStatus
+  is_in_stock: boolean
+}
+
 export type Product = {
   id: string
   source_name: string
   display_name: string
+  name?: string
   slug: string
   source_category: string
   normalized_category: string
+  category?: string
   short_description: string
   long_description: string
+  description?: string
   food_type: string
   egg_status: string
   allergen_information: string[]
+  image?: string
+  price?: number
   price_paise: number | null
   compare_at_price_paise: number | null
+  size_variants?: ProductSizeVariant[]
   price_status: PriceStatus
   availability_status: AvailabilityStatus
+  stock_status?: "in-stock" | "limited" | "out-of-stock"
+  availableSizes?: string[]
   verification_status: VerificationStatus
   image_status: ImageStatus
   source_asset: string

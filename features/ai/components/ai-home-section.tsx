@@ -44,7 +44,7 @@ export function AIHomeSection() {
       </div>
       <div className="mt-6 flex flex-wrap gap-2">
         <Link href="/cake-serving-calculator" className={cn(buttonVariants())}>Calculate Cake Size</Link>
-        <Link href="/ai-assistant" className={cn(buttonVariants({ variant: "outline" }))}>Ask Master AI</Link>
+        <Link href="/ai-assistant" className={cn(buttonVariants({ variant: "outline" }))}>Ask Lala AI</Link>
         <Link href="/custom-cake" className={cn(buttonVariants({ variant: "outline" }))}>Create Custom Cake Request</Link>
       </div>
     </section>

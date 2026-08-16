@@ -1,18 +1,19 @@
-# Master Bakery frontend
+# Sri Lakshmivilas Purathana Lala Sweets frontend
 
-Production-oriented Next.js App Router build for Master Bakery, Sivagangai, Tamil Nadu.
+Production-oriented Next.js App Router build for Sri Lakshmivilas Purathana Lala Sweets, Vannarpettai, Tirunelveli, Tamil Nadu.
 
 ## AI customer experience
 
-The app includes safe fallback implementations for cake serving calculation, Master AI Assistant, custom cake requirement summaries, and Tamil/English voice transcript review.
+The app preserves the original storefront architecture while the public website is positioned around authentic Tirunelveli ghee halwa, traditional sweets, savouries, legacy content, and enquiry-led conversion.
 
 Useful routes:
 
-- `/cake-serving-calculator`
-- `/ai-assistant`
-- `/custom-cake`
-- `/admin/settings/cake-serving-rules`
-- `/admin/ai-settings`
+- `/`
+- `/about`
+- `/menu`
+- `/category/sweets`
+- `/category/savouries`
+- `/contact`
 
 Optional AI provider variables are documented in `.env.example`; the app builds and runs without them.
 
@@ -57,4 +58,4 @@ Razorpay packages are installed, but payment confirmation is not active until se
 
 ## Menu Import
 
-Extracted products live in `data/master-bakery-menu.json`. Missing prices are represented as `null`, never zero, and all extracted items are currently non-orderable.
+Verified public products live in `data/lala-sweets-menu.json`. Missing prices are represented as `null`, never zero, and online checkout remains inactive until current price, pack size and fulfilment details are confirmed by the business.

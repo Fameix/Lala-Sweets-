@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next"
 import { getCategories, getProducts } from "@/lib/catalogue"
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://masterbakery.example"
-  const staticRoutes = ["", "/menu", "/cakes", "/custom-cake", "/search"]
+  const baseUrl = "https://www.lalasweets.in"
+  const staticRoutes = ["", "/about", "/menu", "/contact", "/search"]
   const categoryRoutes = getCategories().map((category) => `/category/${category.slug}`)
   const productRoutes = getProducts().map((product) => `/product/${product.slug}`)
 

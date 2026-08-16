@@ -1,12 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { ChevronRight, ShoppingCart } from "lucide-react"
 
 import { getCartItemCount, subscribeToCart } from "@/lib/cart-client"
 
 export function ViewCartBar() {
+  const pathname = usePathname()
   const [itemCount, setItemCount] = useState(0)
 
   useEffect(() => {
@@ -16,7 +18,9 @@ export function ViewCartBar() {
     return subscribeToCart(sync)
   }, [])
 
-  if (itemCount === 0) {
+  // Checkout has its own sticky "Place Order" bar in the same bottom-of-screen
+  // spot - showing both would overlap and confuse the primary action.
+  if (itemCount === 0 || pathname?.startsWith("/checkout")) {
     return null
   }
 

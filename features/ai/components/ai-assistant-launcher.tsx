@@ -26,17 +26,17 @@ export function AIAssistantLauncher() {
             type="button"
             size="lg"
             className="fixed bottom-20 right-4 z-50 gap-2 shadow-lg md:bottom-5"
-            aria-label="Open Master AI Assistant"
+            aria-label="Open Lala AI Assistant"
           />
         }
       >
         <Bot className="size-4" />
-        <span className="hidden sm:inline">Ask Master AI</span>
+        <span className="hidden sm:inline">Ask Lala AI</span>
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-md" showCloseButton>
         <SheetHeader>
-          <SheetTitle>Master AI Assistant</SheetTitle>
-          <SheetDescription>Find products, calculate cake size, and review voice requests before cart changes.</SheetDescription>
+          <SheetTitle>Lala AI Assistant</SheetTitle>
+          <SheetDescription>Find products and prepare enquiries before contacting the shop.</SheetDescription>
         </SheetHeader>
         <AIAssistantPanel />
       </SheetContent>

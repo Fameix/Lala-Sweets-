@@ -1,8 +1,10 @@
 import { EmptyState } from "@/components/commerce/empty-state"
 import { ProductCard } from "@/components/commerce/product-card"
 import { StorefrontShell } from "@/components/layout/storefront-shell"
+import { SITE_CONTENT_CLASS } from "@/components/layout/storefront-shell"
 import { Input } from "@/components/ui/input"
 import { searchProducts } from "@/lib/catalogue"
+import { cn } from "@/lib/utils"
 
 export default function SearchPage({
   searchParams,
@@ -22,13 +24,13 @@ async function SearchContent({ searchParams }: { searchParams: Promise<{ q?: str
   const products = searchProducts(query)
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <main className={cn(SITE_CONTENT_CLASS, "py-8")}>
       <h1 className="font-heading text-3xl font-medium">Search</h1>
       <form className="mt-5 max-w-xl">
         <label className="text-sm font-medium" htmlFor="q">
           Search products
         </label>
-        <Input id="q" name="q" className="mt-2" defaultValue={query} placeholder="Try milkshake, fries, coffee" />
+        <Input id="q" name="q" className="mt-2" defaultValue={query} placeholder="Try halwa, laddu, mixture" />
       </form>
       <div className="mt-8">
         {products.length > 0 ? (

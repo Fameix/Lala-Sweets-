@@ -28,7 +28,7 @@ export function AIConfirmationCard({
               onDone(true)
             }}
           >
-            Add to Cart
+            Confirm
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => onDone(false)}>
             Cancel

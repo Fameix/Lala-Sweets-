@@ -10,11 +10,11 @@
 
 The listing mentions:
 
-- Master Bakery
+- Lala Sweets
 - Master Grand
 - Master Classic
 - Aranmanai Vasal
-- Near Sivagangai bus stand
+- Historical location note from the previous template; not used for the Lala Sweets site.
 - Gandhi Road
 - Phone numbers: `+91 97509 62227`, `+91 97509 62223`
 - Birthday cakes
@@ -77,7 +77,7 @@ Soup:
 ## Ambiguities Requiring Review
 
 - `Sugar Cane`
-  - Could be sugarcane juice, sugarcane milkshake, or another beverage
+  - Historical extraction notes from the previous template are no longer part of the active Lala Sweets menu.
 - `Tea & Milk`
   - Could be a combined item or two separate items
 - `Gobi 65`

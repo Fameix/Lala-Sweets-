@@ -1,5 +1,5 @@
-import { AdminPlaceholder } from "@/components/layout/admin-placeholder"
+import { AdminDashboard } from "@/components/admin/admin-dashboard"
 
 export default function AdminOrdersPage() {
-  return <AdminPlaceholder title="Orders" description="Order processing will connect to server-side cart totals, payment status, fulfilment status, and audit logs." />
+  return <AdminDashboard />
 }

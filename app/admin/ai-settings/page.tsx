@@ -1,13 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getEnv } from "@/lib/env"
 
+const env = getEnv()
 const settings = [
-  ["AI assistant", process.env.AI_ASSISTANT_ENABLED ?? "fallback"],
-  ["Voice ordering", process.env.AI_VOICE_ENABLED ?? "fallback"],
-  ["Text to speech", process.env.AI_TEXT_TO_SPEECH_ENABLED ?? "disabled"],
-  ["AI provider", process.env.AI_PROVIDER ? "configured" : "not configured"],
-  ["Model", process.env.AI_MODEL ? "configured" : "not configured"],
-  ["Guest daily limit", process.env.AI_GUEST_DAILY_LIMIT ?? "not configured"],
-  ["Conversation retention days", process.env.AI_CONVERSATION_RETENTION_DAYS ?? "not configured"],
+  ["AI assistant", env.AI_ASSISTANT_ENABLED ?? "fallback"],
+  ["Voice ordering", env.AI_VOICE_ENABLED ?? "fallback"],
+  ["Text to speech", env.AI_TEXT_TO_SPEECH_ENABLED ?? "disabled"],
+  ["AI provider", env.AI_PROVIDER ? "configured" : "not configured"],
+  ["Model", env.AI_MODEL ? "configured" : "not configured"],
+  ["Guest daily limit", env.AI_GUEST_DAILY_LIMIT ?? "not configured"],
+  ["Conversation retention days", env.AI_CONVERSATION_RETENTION_DAYS ?? "not configured"],
 ]
 
 export default function AdminAISettingsPage() {

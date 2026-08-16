@@ -1,22 +1,17 @@
-import { Geist_Mono, Outfit, Roboto } from "next/font/google"
-
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AIAssistantLauncher } from "@/features/ai/components/ai-assistant-launcher"
 import { cn } from "@/lib/utils";
 
-const robotoHeading = Roboto({subsets:['latin'],variable:'--font-heading'});
-
-const outfit = Outfit({subsets:['latin'],variable:'--font-sans'})
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-})
-
 export const metadata = {
-  title: "Master Bakery",
-  description: "A shadcn-first Next.js storefront for a modern bakery brand.",
+  title: "Sri Lakshmivilas Purathana Lala Sweets | Tirunelveli Ghee Halwa Since 1882",
+  description:
+    "Sri Lakshmivilas Purathana Lala Sweets in Vannarpettai, Tirunelveli, known for authentic Tirunelveli ghee halwa and traditional sweets since 1882.",
+  openGraph: {
+    title: "Sri Lakshmivilas Purathana Lala Sweets",
+    description: "Authentic Tirunelveli Ghee Halwa & Traditional Sweets since 1882.",
+    type: "website",
+  },
 }
 
 export default function RootLayout({
@@ -28,9 +23,31 @@ export default function RootLayout({
       <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", outfit.variable, robotoHeading.variable)}
+      className={cn("antialiased")}
     >
       <body className="bg-background text-foreground">
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "LocalBusiness",
+              name: "Sri Lakshmivilas Purathana Lala Sweets",
+              description: "Authentic Tirunelveli Ghee Halwa & Traditional Sweets since 1882.",
+              telephone: "+918220266077",
+              email: "srilakshmivilassweets.tvl@gmail.com",
+              address: {
+                "@type": "PostalAddress",
+                streetAddress: "101/1, North Bypass Road, Vannarpettai",
+                addressLocality: "Tirunelveli",
+                addressRegion: "Tamil Nadu",
+                postalCode: "627003",
+                addressCountry: "IN",
+              },
+            }),
+          }}
+        />
         <ThemeProvider>
           {children}
           <AIAssistantLauncher />

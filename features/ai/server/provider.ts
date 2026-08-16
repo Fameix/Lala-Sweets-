@@ -2,6 +2,7 @@ import { calculateCakeServing } from "@/features/serving-calculator/calculate"
 import { getActiveCakeServingRules } from "@/features/serving-calculator/rules"
 import { findCartIntent, searchProductsTool } from "@/features/ai/tools/catalogue-tools"
 import type { AIChatMessage, AIProvider } from "@/features/ai/types"
+import { getEnv } from "@/lib/env"
 
 function detectServingIntent(message: string) {
   const normalized = message.toLowerCase()
@@ -15,7 +16,8 @@ function detectServingIntent(message: string) {
 }
 
 export function getAIProvider(): AIProvider {
-  const configured = Boolean(process.env.AI_PROVIDER && process.env.AI_MODEL && process.env.AI_API_KEY)
+  const env = getEnv()
+  const configured = Boolean(env.AI_PROVIDER && env.AI_MODEL && env.AI_API_KEY)
 
   return {
     status: configured ? "configured" : "fallback",
@@ -54,7 +56,7 @@ export function getAIProvider(): AIProvider {
       }
 
       const products = searchProductsTool(message)
-      const tamilPrefix = language === "ta" ? "உறுதிப்படுத்தப்பட்ட பொருட்களில் இருந்து கண்டுபிடித்தவை:" : "Here are matching Master Bakery catalogue items:"
+      const tamilPrefix = language === "ta" ? "உறுதிப்படுத்தப்பட்ட பொருட்களில் இருந்து கண்டுபிடித்தவை:" : "Here are matching Lala Sweets catalogue items:"
 
       if (products.length === 0) {
         return {

@@ -1,55 +1,50 @@
 import Link from "next/link"
-import { LockKeyhole } from "lucide-react"
+import { ShieldAlert } from "lucide-react"
 
-import { buttonVariants } from "@/components/ui/button"
+import { AppSidebar } from "@/components/app-sidebar"
+import { Separator } from "@/components/ui/separator"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { canPreviewAdmin } from "@/server/auth/admin"
-import { cn } from "@/lib/utils"
-
-const adminLinks = [
-  { href: "/admin", label: "Dashboard" },
-  { href: "/admin/catalogue-review", label: "Catalogue Review" },
-  { href: "/admin/products", label: "Products" },
-  { href: "/admin/orders", label: "Orders" },
-  { href: "/admin/settings", label: "Settings" },
-  { href: "/admin/settings/cake-serving-rules", label: "Serving Rules" },
-  { href: "/admin/ai-settings", label: "AI Settings" },
-]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   if (!canPreviewAdmin()) {
     return (
-      <main className="flex min-h-svh items-center justify-center bg-background px-4 text-foreground">
-        <div className="max-w-md rounded-2xl border border-border bg-card p-6 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted">
-            <LockKeyhole className="size-5" />
+      <div className="min-h-svh bg-background text-foreground">
+        <div className="border-b border-border bg-card px-4 py-3">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <ShieldAlert className="size-4" />
+            <span>Admin preview is disabled.</span>
+            <Link href="/" className="font-medium text-primary underline underline-offset-4">
+              Back to storefront
+            </Link>
           </div>
-          <h1 className="mt-5 font-heading text-2xl font-medium">Admin access is protected</h1>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Supabase role-based auth is not connected yet. Set ADMIN_PREVIEW_ENABLED=true only for local catalogue review.
-          </p>
-          <Link href="/" className={cn(buttonVariants({ variant: "outline" }), "mt-6")}>
-            Back to storefront
-          </Link>
         </div>
-      </main>
+        {children}
+      </div>
     )
   }
 
   return (
-    <div className="min-h-svh bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-border bg-card p-4 md:block">
-        <Link href="/admin" className="font-heading text-lg font-medium">
-          Master Bakery Admin
-        </Link>
-        <nav className="mt-6 grid gap-1">
-          {adminLinks.map((link) => (
-            <Link key={link.href} href={link.href} className={cn(buttonVariants({ variant: "ghost" }), "justify-start")}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      <div className="md:pl-64">{children}</div>
-    </div>
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 data-vertical:h-4" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">Lala Sweets Admin</p>
+              <p className="truncate text-xs text-muted-foreground">Backend operations dashboard</p>
+            </div>
+          </header>
+          {children}
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   )
 }
