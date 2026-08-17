@@ -1,4 +1,3 @@
-import { getCakeProducts } from "@/lib/catalogue"
 import type { Product } from "@/types/catalogue"
 import { calculateCakeServingEstimate, roundCakeWeight } from "./estimate"
 import type { CakeServingRules, DessertContext, PortionPreference } from "./rules"
@@ -30,10 +29,14 @@ export type CakeServingResult = {
 
 export { roundCakeWeight }
 
-export function calculateCakeServing(input: CakeServingInput, rules: CakeServingRules): CakeServingResult {
+export function calculateCakeServing(
+  input: CakeServingInput,
+  rules: CakeServingRules,
+  cakeProducts: Product[] = [],
+): CakeServingResult {
   const estimate = calculateCakeServingEstimate(input, rules)
   const { adjustedRequirementGrams, rawRequirementGrams, recommendedWeightGrams, servingRange } = estimate
-  const activeCakes = getCakeProducts().filter((cake) => cake.is_active)
+  const activeCakes = cakeProducts.filter((cake) => cake.is_active && cake.product_type === "cake")
   const orderableMatches = activeCakes.filter((cake) =>
     (cake.available_weights ?? []).some(
       (variant) =>

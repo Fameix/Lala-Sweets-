@@ -1,9 +1,9 @@
 import { CartContent } from "@/components/commerce/cart-content"
 import { StorefrontShell } from "@/components/layout/storefront-shell"
-import { getProducts } from "@/lib/catalogue"
+import { getProducts } from "@/lib/catalogue-server"
 
-export default function CartPage() {
-  const products = getProducts()
+export default async function CartPage() {
+  const products = await getProducts()
 
   return (
     <StorefrontShell>

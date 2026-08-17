@@ -21,7 +21,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { BadgeCheckIcon, BellIcon, ChevronsUpDownIcon, LogOutIcon, SettingsIcon } from "lucide-react"
+import { useAdminAuth } from "@/lib/admin-auth-client"
+import { BadgeCheckIcon, ChevronsUpDownIcon, LogOutIcon, SettingsIcon } from "lucide-react"
 
 export function NavUser({
   user,
@@ -33,6 +34,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const { signOut } = useAdminAuth()
 
   return (
     <SidebarMenu>
@@ -66,23 +68,22 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem render={<Link href="/admin/team" />}>
+              <DropdownMenuItem render={<Link href="/admin/settings" />}>
                 <BadgeCheckIcon />
-                Team
+                Admin Profile
               </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/admin/settings" />}>
                 <SettingsIcon />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon />
-                Notifications
-              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem render={<Link href="/" />}>
+              Back to storefront
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void signOut()}>
               <LogOutIcon />
-              Storefront
+              Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

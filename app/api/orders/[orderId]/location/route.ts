@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
-import { requirePartnerActor } from "@/lib/delivery-auth"
-import { getLiveLocation, updateLiveLocation } from "@/lib/orders-server"
+import { requireAdminActor, requirePartnerActor } from "@/lib/delivery-auth"
+import { getLiveLocation, getLiveLocationForCustomer, updateLiveLocation } from "@/lib/orders-server"
 
 const liveLocationSchema = z.object({
   partnerId: z.string().min(1),
@@ -11,13 +11,23 @@ const liveLocationSchema = z.object({
   accuracy: z.number().nonnegative(),
   timestamp: z.number().int().positive(),
   isOnline: z.boolean().optional(),
+  heading: z.number().min(0).max(360).optional(),
 })
 
-export async function GET(_request: Request, context: { params: Promise<{ orderId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await context.params
 
   try {
-    const liveLocation = await getLiveLocation(orderId)
+    // Admins can read any order's live location (needed for the Live
+    // Deliveries dashboard); everyone else still needs the checkout phone
+    // number to match, same as before.
+    const isAdmin = await requireAdminActor(request)
+      .then(() => true)
+      .catch(() => false)
+
+    const liveLocation = isAdmin
+      ? await getLiveLocation(orderId)
+      : await getLiveLocationForCustomer(orderId, new URL(request.url).searchParams.get("mobile") ?? "")
 
     if (!liveLocation) {
       return NextResponse.json({ error: "Location not found." }, { status: 404 })

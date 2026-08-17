@@ -37,6 +37,7 @@ export type Product = {
   price_status: PriceStatus
   availability_status: AvailabilityStatus
   stock_status?: "in-stock" | "limited" | "out-of-stock"
+  stock_quantity?: number
   availableSizes?: string[]
   verification_status: VerificationStatus
   image_status: ImageStatus

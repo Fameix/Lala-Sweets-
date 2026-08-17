@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Calculator, ExternalLink } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -46,7 +46,29 @@ export function CakeServingCalculator({ compact = false }: { compact?: boolean }
   const [form, setForm] = useState<FormState>(initialState)
   const [result, setResult] = useState<CakeServingResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [cakeProducts, setCakeProducts] = useState<Product[]>([])
   const rules = useMemo(() => getActiveCakeServingRules(), [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetch("/api/products", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload: { products?: Product[] }) => {
+        if (!cancelled) {
+          setCakeProducts((payload.products ?? []).filter((product) => product.product_type === "cake"))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCakeProducts([])
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }))
 
@@ -65,7 +87,8 @@ export function CakeServingCalculator({ compact = false }: { compact?: boolean }
           requiredDate: form.requiredDate,
           preferredBranch: form.preferredBranch,
         },
-        rules
+        rules,
+        cakeProducts,
       )
       setResult(next)
       setError(null)

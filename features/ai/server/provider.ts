@@ -2,6 +2,7 @@ import { calculateCakeServing } from "@/features/serving-calculator/calculate"
 import { getActiveCakeServingRules } from "@/features/serving-calculator/rules"
 import { findCartIntent, searchProductsTool } from "@/features/ai/tools/catalogue-tools"
 import type { AIChatMessage, AIProvider } from "@/features/ai/types"
+import { getCakeProducts } from "@/lib/catalogue-server"
 import { getEnv } from "@/lib/env"
 
 function detectServingIntent(message: string) {
@@ -23,20 +24,21 @@ export function getAIProvider(): AIProvider {
     status: configured ? "configured" : "fallback",
     async generateAssistantResponse({ message, language }) {
       const id = crypto.randomUUID()
-      const cartIntent = findCartIntent(message)
+      const cartIntent = await findCartIntent(message)
 
       if (cartIntent) {
         return {
           id,
           role: "assistant",
           content: "Please confirm before I change your cart.",
-          products: searchProductsTool(message).slice(0, 1),
+          products: (await searchProductsTool(message)).slice(0, 1),
           confirmation: cartIntent,
         }
       }
 
       const guests = detectServingIntent(message)
       if (guests) {
+        const cakeProducts = await getCakeProducts()
         const result = calculateCakeServing(
           {
             adults: guests,
@@ -44,7 +46,8 @@ export function getAIProvider(): AIProvider {
             portionPreference: "standard",
             dessertContext: "main-dessert",
           },
-          getActiveCakeServingRules()
+          getActiveCakeServingRules(),
+          cakeProducts,
         )
 
         return {
@@ -55,7 +58,7 @@ export function getAIProvider(): AIProvider {
         }
       }
 
-      const products = searchProductsTool(message)
+      const products = await searchProductsTool(message)
       const tamilPrefix = language === "ta" ? "உறுதிப்படுத்தப்பட்ட பொருட்களில் இருந்து கண்டுபிடித்தவை:" : "Here are matching Lala Sweets catalogue items:"
 
       if (products.length === 0) {

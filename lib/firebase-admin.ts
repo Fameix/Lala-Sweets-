@@ -1,6 +1,6 @@
 import "server-only"
 
-import { applicationDefault, cert, getApps, initializeApp, type App, type Credential } from "firebase-admin/app"
+import { cert, getApps, initializeApp, type App, type Credential } from "firebase-admin/app"
 import { getAuth } from "firebase-admin/auth"
 import { getDatabase } from "firebase-admin/database"
 import { getFirestore } from "firebase-admin/firestore"
@@ -190,7 +190,9 @@ function resolveFirebaseAdminCredential(): { credential: Credential; source: Cre
     }
   }
 
-  return { credential: applicationDefault(), source: "application-default" }
+  throw new Error(
+    "Firebase Admin credentials are not configured. Add FIREBASE_SERVICE_ACCOUNT_KEY as a single-line JSON service account, or set FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY. Do not rely on Application Default Credentials for local development here.",
+  )
 }
 
 function buildFirebaseAdminDiagnostics(projectId: string, databaseURL: string, credentialSource: CredentialSource): FirebaseAdminDiagnostics {

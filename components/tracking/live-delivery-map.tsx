@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react"
 import { LocateFixed, Phone } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { LiveBadge } from "@/components/ui/status-badge"
-import type { EtaResult } from "@/lib/delivery-eta"
+import { LiveBadge, type LiveTrackingStatus } from "@/components/ui/status-badge"
+import { formatRouteEta, type EtaResult } from "@/lib/delivery-eta"
+import { fetchDrivingRoute } from "@/lib/google-routes"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +18,7 @@ type RiderLocation = {
   accuracy: number
   timestamp: number
   isOnline?: boolean
+  heading?: number
 }
 
 // Rotation is baked into the SVG (only the vehicle glyph rotates, the ground
@@ -64,9 +66,21 @@ const mapStyles: google.maps.MapTypeStyle[] = [
   { featureType: "road", elementType: "geometry", stylers: [{ saturation: -10 }] },
 ]
 
+// Route recalculation is throttled on two axes, not just distance, per the
+// "10-20s maximum" requirement: a big jump (new road, wrong turn) recalculates
+// immediately, but a slow-moving rider still gets a periodic refresh rather
+// than being stuck on an increasingly stale route.
 const routeMoveThresholdMeters = 40
+const routeMinIntervalMs = 15_000
+const routeMinMovementForIntervalRefreshMeters = 8
+// If the rider's GPS position drifts this far from the last computed route,
+// treat it as a deviation (wrong turn, road closure) and recalculate right
+// away regardless of the throttle above.
+const routeDeviationThresholdMeters = 60
 const animationDurationMs = 900
-const remainingRouteColor = "#7c2d12"
+// Deep maroon/oxblood - the same brand primary used for the Razorpay
+// checkout theme - instead of the previous straight brown line.
+const remainingRouteColor = "#5c1a14"
 const traveledRouteColor = "#9ca3af"
 
 function easeInOutQuad(t: number) {
@@ -93,27 +107,71 @@ function computeBearing(from: LatLng, to: LatLng) {
   return (toDegrees(Math.atan2(y, x)) + 360) % 360
 }
 
+/** Index of, and distance (metres) to, the path vertex closest to `point`. */
+/**
+ * "updating" status copy - GPS is momentarily stale but the tracking session
+ * is still active (not offline). Mirrors the phrasing called for explicitly:
+ * a short freeze right after going stale, then an increasingly specific
+ * "last updated" readout the longer it's been.
+ */
+function formatUpdatingLabel(lastUpdateMs: number | undefined, now: number) {
+  if (!lastUpdateMs) {
+    return "Waiting for latest location..."
+  }
+
+  const secondsAgo = Math.max(0, Math.round((now - lastUpdateMs) / 1000))
+
+  if (secondsAgo < 10) {
+    return "Location updating..."
+  }
+
+  if (secondsAgo < 60) {
+    return `Last updated ${secondsAgo} sec ago`
+  }
+
+  const minutesAgo = Math.round(secondsAgo / 60)
+  return `Last location updated ${minutesAgo} min ago`
+}
+
+function findClosestPointOnPath(point: LatLng, path: LatLng[]) {
+  let closestIndex = 0
+  let closestDistanceMeters = Infinity
+
+  for (let i = 0; i < path.length; i += 1) {
+    const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+      new window.google.maps.LatLng(path[i]),
+      new window.google.maps.LatLng(point),
+    )
+
+    if (distance < closestDistanceMeters) {
+      closestDistanceMeters = distance
+      closestIndex = i
+    }
+  }
+
+  return { closestIndex, closestDistanceMeters }
+}
+
 export function LiveDeliveryMap({
   apiKey,
   riderLocation,
   destinationAddress,
-  isLive,
+  liveStatus,
+  now,
   statusLabel,
   riderName,
   riderPhone,
-  eta,
-  onDestinationResolved,
   className,
 }: {
   apiKey?: string
   riderLocation: RiderLocation | null
   destinationAddress?: string
-  isLive: boolean
+  liveStatus: LiveTrackingStatus
+  /** Caller's ticking clock (ms since epoch), used to render "last updated X ago" without a duplicate timer. */
+  now: number
   statusLabel?: string
   riderName?: string
   riderPhone?: string
-  eta?: EtaResult
-  onDestinationResolved?: (position: LatLng) => void
   className?: string
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -121,15 +179,15 @@ export function LiveDeliveryMap({
   const riderMarkerRef = useRef<google.maps.Marker | null>(null)
   const riderRotationRef = useRef(0)
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null)
-  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null)
-  const fallbackPolylineRef = useRef<google.maps.Polyline | null>(null)
   const traveledPolylineRef = useRef<google.maps.Polyline | null>(null)
+  const remainingGlowPolylineRef = useRef<google.maps.Polyline | null>(null)
   const remainingPolylineRef = useRef<google.maps.Polyline | null>(null)
   const overviewPathRef = useRef<LatLng[]>([])
   const destinationPositionRef = useRef<LatLng | null>(null)
   const currentRiderPositionRef = useRef<LatLng | null>(null)
   const lastRoutePositionRef = useRef<LatLng | null>(null)
-  const directionsUnavailableRef = useRef(false)
+  const lastRouteRequestAtRef = useRef(0)
+  const routeAbortControllerRef = useRef<AbortController | null>(null)
   const hasFittedRef = useRef(false)
   const animationFrameRef = useRef<number | null>(null)
   const geocodedAddressRef = useRef<string | null>(null)
@@ -138,6 +196,8 @@ export function LiveDeliveryMap({
   const [scriptError, setScriptError] = useState("")
   const [mapReady, setMapReady] = useState(false)
   const [following, setFollowing] = useState(true)
+  const [routeEta, setRouteEta] = useState<EtaResult>(null)
+  const [routeStatus, setRouteStatus] = useState<"idle" | "ok" | "error">("idle")
 
   useEffect(() => {
     followingRef.current = following
@@ -225,8 +285,7 @@ export function LiveDeliveryMap({
         destinationPositionRef.current = { lat: location.lat(), lng: location.lng() }
         renderDestinationMarker()
         maybeFitBounds()
-        void maybeUpdateRoute(true)
-        onDestinationResolved?.(destinationPositionRef.current)
+        void requestRoute(true)
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -273,12 +332,12 @@ export function LiveDeliveryMap({
   }
 
   /**
-   * Splits the known route into a "traveled" segment (muted gray, behind the
-   * rider) and a "remaining" segment (bold, ahead of the rider) by finding
-   * the closest route vertex to the rider's current position - the
-   * nav-app-style progress line. Only meaningful once a real road-following
-   * route exists; the straight-line fallback has no useful notion of
-   * "progress" so it's left as a single line.
+   * Splits the known road-following route into a "traveled" segment (muted
+   * gray, behind the rider) and a "remaining" segment (brand maroon, ahead of
+   * the rider, with a soft translucent glow underneath for a premium
+   * delivery-app look) by finding the closest route vertex to the rider's
+   * current position - the nav-app-style progress line. No-ops until a real
+   * route has been fetched; there is no straight-line fallback to draw.
    */
   function renderProgressPolylines() {
     const map = mapRef.current
@@ -289,21 +348,7 @@ export function LiveDeliveryMap({
       return
     }
 
-    let closestIndex = 0
-    let closestDistance = Infinity
-
-    for (let i = 0; i < path.length; i += 1) {
-      const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-        new window.google.maps.LatLng(path[i]),
-        new window.google.maps.LatLng(rider),
-      )
-
-      if (distance < closestDistance) {
-        closestDistance = distance
-        closestIndex = i
-      }
-    }
-
+    const { closestIndex } = findClosestPointOnPath(rider, path)
     const traveledPath = [...path.slice(0, closestIndex + 1), rider]
     const remainingPath = [rider, ...path.slice(closestIndex + 1)]
 
@@ -320,6 +365,21 @@ export function LiveDeliveryMap({
       traveledPolylineRef.current.setPath(traveledPath)
     }
 
+    // Wider, translucent line underneath the solid one - a cheap "glow" that
+    // reads as a rounded, premium route line instead of a plain stroke.
+    if (!remainingGlowPolylineRef.current) {
+      remainingGlowPolylineRef.current = new window.google.maps.Polyline({
+        map,
+        path: remainingPath,
+        strokeColor: remainingRouteColor,
+        strokeOpacity: 0.18,
+        strokeWeight: 8,
+        zIndex: 2,
+      })
+    } else {
+      remainingGlowPolylineRef.current.setPath(remainingPath)
+    }
+
     if (!remainingPolylineRef.current) {
       remainingPolylineRef.current = new window.google.maps.Polyline({
         map,
@@ -327,119 +387,114 @@ export function LiveDeliveryMap({
         strokeColor: remainingRouteColor,
         strokeOpacity: 0.95,
         strokeWeight: 6,
-        zIndex: 2,
+        zIndex: 3,
       })
     } else {
       remainingPolylineRef.current.setPath(remainingPath)
     }
   }
 
-  function clearProgressPolylines() {
-    traveledPolylineRef.current?.setMap(null)
-    traveledPolylineRef.current = null
-    remainingPolylineRef.current?.setMap(null)
-    remainingPolylineRef.current = null
-  }
-
-  async function maybeUpdateRoute(force = false) {
+  /**
+   * Fetches (or refreshes) the road-following route via the Routes API. Never
+   * draws a straight line - on failure it leaves whatever polylines are
+   * already on the map untouched (the last known good route) and surfaces
+   * routeStatus "error" so the UI can show "ETA temporarily unavailable"
+   * instead of a fabricated number.
+   *
+   * Throttled on three axes:
+   * - `force` (destination just resolved, or the rider has clearly gone off
+   *   the current route) always refetches immediately.
+   * - a meaningful GPS move (>= routeMoveThresholdMeters) refetches.
+   * - otherwise, at most once every routeMinIntervalMs while still moving at
+   *   all, so a slow-moving rider's route doesn't go stale for minutes, but a
+   *   parked rider doesn't spam the API either.
+   */
+  async function requestRoute(force = false) {
     const map = mapRef.current
     const rider = currentRiderPositionRef.current
     const destination = destinationPositionRef.current
 
-    if (!map || !rider || !destination) {
+    if (!map || !rider || !destination || !apiKey || !window.google?.maps?.geometry?.encoding) {
       return
     }
 
-    if (!force && lastRoutePositionRef.current) {
+    let shouldFetch = force
+
+    if (!shouldFetch && overviewPathRef.current.length > 1) {
+      const { closestDistanceMeters } = findClosestPointOnPath(rider, overviewPathRef.current)
+      if (closestDistanceMeters > routeDeviationThresholdMeters) {
+        shouldFetch = true
+      }
+    }
+
+    if (!shouldFetch && !lastRoutePositionRef.current) {
+      shouldFetch = true
+    }
+
+    if (!shouldFetch && lastRoutePositionRef.current) {
       const moved = window.google.maps.geometry.spherical.computeDistanceBetween(
         new window.google.maps.LatLng(lastRoutePositionRef.current),
         new window.google.maps.LatLng(rider),
       )
+      const elapsedMs = Date.now() - lastRouteRequestAtRef.current
 
-      if (moved < routeMoveThresholdMeters) {
-        return
+      if (moved >= routeMoveThresholdMeters) {
+        shouldFetch = true
+      } else if (elapsedMs >= routeMinIntervalMs && moved >= routeMinMovementForIntervalRefreshMeters) {
+        shouldFetch = true
       }
     }
 
-    lastRoutePositionRef.current = rider
-
-    if (directionsUnavailableRef.current) {
-      clearProgressPolylines()
-      drawFallbackPolyline(map, rider, destination)
+    if (!shouldFetch) {
       return
     }
 
+    lastRoutePositionRef.current = rider
+    lastRouteRequestAtRef.current = Date.now()
+
+    routeAbortControllerRef.current?.abort()
+    const controller = new AbortController()
+    routeAbortControllerRef.current = controller
+
     try {
-      const directionsService = new window.google.maps.DirectionsService()
-      const result = await directionsService.route({
-        origin: rider,
-        destination,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      })
+      const route = await fetchDrivingRoute({ apiKey, origin: rider, destination, signal: controller.signal })
 
-      if (fallbackPolylineRef.current) {
-        fallbackPolylineRef.current.setMap(null)
-        fallbackPolylineRef.current = null
+      if (controller.signal.aborted) {
+        return
       }
 
-      if (!directionsRendererRef.current) {
-        directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-          map,
-          suppressMarkers: true,
-          preserveViewport: true,
-          // The route line itself is drawn manually (renderProgressPolylines)
-          // so it can be split into traveled/remaining colors - the renderer
-          // is only used to fetch/hold the road-following path.
-          polylineOptions: { strokeOpacity: 0, strokeWeight: 0 },
-        })
-      }
-
-      directionsRendererRef.current.setDirections(result)
-      overviewPathRef.current = (result.routes[0]?.overview_path ?? []).map((point) => ({
-        lat: point.lat(),
-        lng: point.lng(),
-      }))
+      overviewPathRef.current = route.path
       renderProgressPolylines()
+      setRouteEta(formatRouteEta({ distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds }))
+      setRouteStatus("ok")
     } catch (error) {
-      // Directions API unavailable for this key/project - stop retrying it and
-      // fall back to a direct line for the rest of this session.
-      if (error instanceof Error && /REQUEST_DENIED|not enabled|legacy API/i.test(error.message)) {
-        directionsUnavailableRef.current = true
+      if (controller.signal.aborted) {
+        return
       }
 
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setMap(null)
-        directionsRendererRef.current = null
-      }
-
-      overviewPathRef.current = []
-      clearProgressPolylines()
-      drawFallbackPolyline(map, rider, destination)
+      console.error("[live-delivery-map] route request failed", error)
+      // Deliberately do NOT clear overviewPathRef/polylines here - the last
+      // known good route stays on the map. Only the ETA panel reflects the
+      // failure, via routeStatus.
+      setRouteStatus("error")
     }
   }
 
-  function drawFallbackPolyline(map: google.maps.Map, rider: LatLng, destination: LatLng) {
-    if (!fallbackPolylineRef.current) {
-      fallbackPolylineRef.current = new window.google.maps.Polyline({
-        map,
-        path: [rider, destination],
-        strokeColor: remainingRouteColor,
-        strokeOpacity: 0.85,
-        strokeWeight: 5,
-        icons: [{ icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 }, offset: "0", repeat: "14px" }],
-      })
-    } else {
-      fallbackPolylineRef.current.setPath([rider, destination])
-    }
-  }
-
-  function animateRiderMarker(from: LatLng | null, to: LatLng) {
+  function animateRiderMarker(from: LatLng | null, to: LatLng, deviceHeading?: number) {
     const map = mapRef.current
     if (!map) {
       return
     }
 
-    if (from) {
+    // Prefer the partner device's compass heading when available - it's
+    // accurate even while the partner is stationary (e.g. waiting at a
+    // signal), unlike the GPS-derived bearing below which needs real
+    // movement between two points and can't say anything while parked.
+    let bearing: number | null = null
+
+    if (typeof deviceHeading === "number" && Number.isFinite(deviceHeading)) {
+      bearing = ((deviceHeading % 360) + 360) % 360
+    } else if (from) {
       const distanceMoved = window.google.maps.geometry.spherical.computeDistanceBetween(
         new window.google.maps.LatLng(from),
         new window.google.maps.LatLng(to),
@@ -448,17 +503,21 @@ export function LiveDeliveryMap({
       // Ignore GPS jitter for heading purposes - a stationary rider shouldn't
       // have their marker spin to a noisy bearing.
       if (distanceMoved > 3) {
-        const bearing = computeBearing(from, to)
-        const bucketed = Math.round(bearing / 10) * 10
+        bearing = computeBearing(from, to)
+      }
+    }
 
-        if (bucketed !== riderRotationRef.current) {
-          riderRotationRef.current = bucketed
-          riderMarkerRef.current?.setIcon({
-            url: toIconUrl(buildRiderIconSvg(bucketed)),
-            scaledSize: new window.google.maps.Size(48, 48),
-            anchor: new window.google.maps.Point(24, 24),
-          })
-        }
+    if (bearing !== null) {
+      const bucketed = Math.round(bearing / 10) * 10
+      const normalized = bucketed >= 360 ? 0 : bucketed
+
+      if (normalized !== riderRotationRef.current) {
+        riderRotationRef.current = normalized
+        riderMarkerRef.current?.setIcon({
+          url: toIconUrl(buildRiderIconSvg(normalized)),
+          scaledSize: new window.google.maps.Size(48, 48),
+          anchor: new window.google.maps.Point(24, 24),
+        })
       }
     }
 
@@ -519,24 +578,25 @@ export function LiveDeliveryMap({
     const nextPosition: LatLng = { lat: riderLocation.latitude, lng: riderLocation.longitude }
     const previousPosition = currentRiderPositionRef.current
 
-    animateRiderMarker(previousPosition, nextPosition)
+    animateRiderMarker(previousPosition, nextPosition, riderLocation.heading)
     currentRiderPositionRef.current = nextPosition
 
     maybeFitBounds()
     renderProgressPolylines()
-    void maybeUpdateRoute()
+    void requestRoute()
 
     if (followingRef.current && mapRef.current) {
       mapRef.current.panTo(nextPosition)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, riderLocation?.latitude, riderLocation?.longitude, riderLocation?.timestamp])
+  }, [mapReady, riderLocation?.latitude, riderLocation?.longitude, riderLocation?.timestamp, riderLocation?.heading])
 
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
+      routeAbortControllerRef.current?.abort()
     }
   }, [])
 
@@ -579,7 +639,7 @@ export function LiveDeliveryMap({
       ) : null}
 
       <div className="pointer-events-none absolute left-3 top-3">
-        <LiveBadge live={isLive} />
+        <LiveBadge status={liveStatus} />
       </div>
 
       {mapReady ? (
@@ -603,17 +663,21 @@ export function LiveDeliveryMap({
             <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-border" />
 
             <div className="flex items-center gap-3 px-4 pb-1.5 pt-2.5">
-              {eta ? (
+              {routeStatus === "ok" && routeEta ? (
                 <>
                   <div className="shrink-0">
-                    <p className="font-heading text-2xl font-semibold leading-none text-primary">{eta.minutes}</p>
+                    <p className="font-heading text-2xl font-semibold leading-none text-primary">{routeEta.minutes}</p>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">min</p>
                   </div>
                   <div className="min-w-0 flex-1 border-l border-border pl-3">
-                    <p className="truncate text-sm font-medium text-foreground">{eta.distanceKm} km away</p>
-                    <p className="truncate text-xs text-muted-foreground">Arriving {eta.clockLabel}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{routeEta.distanceKm} km away</p>
+                    <p className="truncate text-xs text-muted-foreground">Arriving {routeEta.clockLabel}</p>
                   </div>
                 </>
+              ) : routeStatus === "error" ? (
+                <p className="flex-1 text-sm text-muted-foreground">ETA temporarily unavailable</p>
+              ) : riderLocation ? (
+                <p className="flex-1 text-sm text-muted-foreground">Calculating live ETA...</p>
               ) : (
                 <p className="flex-1 text-sm text-muted-foreground">
                   Estimated arrival will update once your order is out for delivery.
@@ -627,7 +691,13 @@ export function LiveDeliveryMap({
               </div>
               <div className="min-w-0 flex-1">
                 {statusLabel ? <p className="truncate text-sm font-semibold text-foreground">{statusLabel}</p> : null}
-                <p className="truncate text-xs text-muted-foreground">{riderName} is on the way with your order</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {liveStatus === "live"
+                    ? `${riderName} is on the way with your order`
+                    : liveStatus === "updating"
+                      ? formatUpdatingLabel(riderLocation?.timestamp, now)
+                      : "Tracking session ended"}
+                </p>
               </div>
               {riderPhone ? (
                 <a href={`tel:${riderPhone}`} className="shrink-0">

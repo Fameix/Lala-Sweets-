@@ -4,7 +4,6 @@ import type { DecodedIdToken } from "firebase-admin/auth"
 
 import { getFirebaseAdminAuth } from "@/lib/firebase-admin"
 import { getEnv } from "@/lib/env"
-import { canPreviewAdmin } from "@/server/auth/admin"
 
 export type DeliveryActorRole = "admin" | "partner"
 
@@ -33,22 +32,8 @@ async function verifyFirebaseToken(token: string): Promise<DecodedIdToken | null
   }
 }
 
-// Gates the /api/admin/* delivery routes, which are only ever called from the
-// already env-gated /admin UI (see server/auth/admin.ts + app/admin/layout.tsx).
-// This matches the trust boundary the rest of the admin section already uses,
-// instead of shipping the DELIVERY_ADMIN_API_KEY secret to the browser.
-export function requireAdminPreview() {
-  if (!canPreviewAdmin()) {
-    throw new Response(JSON.stringify({ error: "Admin preview is disabled." }), {
-      status: 403,
-      headers: { "content-type": "application/json" },
-    })
-  }
-}
-
-export async function requireAdminActor(request: Request): Promise<DeliveryActor> {
+async function requireAdminActorFromToken(providedToken: string): Promise<DeliveryActor> {
   const env = getEnv()
-  const providedToken = readAuthHeader(request)
 
   if (!providedToken) {
     throw new Response(JSON.stringify({ error: "Unauthorized." }), {
@@ -72,7 +57,7 @@ export async function requireAdminActor(request: Request): Promise<DeliveryActor
   const decoded = await verifyFirebaseToken(providedToken)
   const decodedRecord = decoded as Record<string, unknown> | null
 
-  if (decoded && (decodedRecord?.admin === true || decodedRecord?.role === "admin")) {
+  if (decoded && decodedRecord?.admin === true) {
     return {
       role: "admin",
       uid: decoded.uid,
@@ -83,6 +68,19 @@ export async function requireAdminActor(request: Request): Promise<DeliveryActor
     status: 403,
     headers: { "content-type": "application/json" },
   })
+}
+
+export async function requireAdminActor(request: Request): Promise<DeliveryActor> {
+  return requireAdminActorFromToken(readAuthHeader(request))
+}
+
+// EventSource (used by the admin order-alerts SSE stream) can't set custom
+// headers, so the ID token travels as a query param instead of an
+// Authorization header for that one route. Same verification as
+// requireAdminActor otherwise.
+export async function requireAdminActorFromQueryToken(request: Request): Promise<DeliveryActor> {
+  const url = new URL(request.url)
+  return requireAdminActorFromToken(url.searchParams.get("token")?.trim() || "")
 }
 
 export async function requirePartnerActor(request: Request, partnerId?: string): Promise<DeliveryActor> {

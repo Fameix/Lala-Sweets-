@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react"
 
+import { ContactForm } from "@/components/commerce/contact-form"
 import { StorefrontShell } from "@/components/layout/storefront-shell"
 import { SITE_CONTENT_CLASS } from "@/components/layout/storefront-shell"
 import { buttonVariants } from "@/components/ui/button"
@@ -56,13 +57,16 @@ export default function ContactPage() {
               </div>
             </CardContent>
           </Card>
-          <div className="min-h-[360px] overflow-hidden rounded-lg border border-border bg-card">
-            <iframe
-              title="Map to Sri Lakshmivilas Purathana Lala Sweets"
-              src="https://www.google.com/maps?q=101%2F1%20North%20Bypass%20Road%20Vannarpettai%20Tirunelveli%20Tamil%20Nadu%20627003%20India&output=embed"
-              className="h-full min-h-[360px] w-full"
-              loading="lazy"
-            />
+          <div className="grid gap-5">
+            <div className="min-h-[240px] overflow-hidden rounded-lg border border-border bg-card">
+              <iframe
+                title="Map to Sri Lakshmivilas Purathana Lala Sweets"
+                src="https://www.google.com/maps?q=101%2F1%20North%20Bypass%20Road%20Vannarpettai%20Tirunelveli%20Tamil%20Nadu%20627003%20India&output=embed"
+                className="h-full min-h-[240px] w-full"
+                loading="lazy"
+              />
+            </div>
+            <ContactForm />
           </div>
         </div>
       </main>

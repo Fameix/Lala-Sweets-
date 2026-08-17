@@ -1,17 +1,18 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Phone, PartyPopper } from "lucide-react"
 
-import { LiveDeliveryMap, type LatLng } from "@/components/tracking/live-delivery-map"
+import { LiveDeliveryMap } from "@/components/tracking/live-delivery-map"
 import { OrderTimeline } from "@/components/tracking/order-timeline"
 import { RiderCard } from "@/components/tracking/rider-card"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { LiveBadge } from "@/components/ui/status-badge"
-import { estimateDeliveryEta } from "@/lib/delivery-eta"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { LiveBadge, type LiveTrackingStatus } from "@/components/ui/status-badge"
 import { getFirebaseClientDatabase } from "@/lib/firebase-client"
 import { orderStatusLabels, orderStatusMessages } from "@/lib/order-status-labels"
 import type { DeliveryType, OrderStatusCode } from "@/lib/order-types"
@@ -19,6 +20,13 @@ import { cn } from "@/lib/utils"
 import { onValue, ref } from "firebase/database"
 
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+// A watchPosition update is expected roughly every few seconds
+// (maximumAge: 5000 in the partner page). Within this window we call the
+// feed "live"; older than this but the tracking session is still active
+// (isOnline !== false) we call it "updating", never "offline" - staleness
+// alone must never flip a rider to offline, only an explicit session end
+// (delivery completion, which sets isOnline: false server-side) does that.
+const liveFreshThresholdMs = 20_000
 const supportPhone = "+918220266077"
 
 type TrackingPayload = {
@@ -45,6 +53,7 @@ type TrackingPayload = {
     orderId: string
     partnerId?: string
     isOnline?: boolean
+    heading?: number
   } | null
 }
 
@@ -65,18 +74,23 @@ function TrackOrderContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get("orderId")?.trim() ?? ""
 
+  const [mobile, setMobile] = useState(() => searchParams.get("mobile")?.trim() ?? "")
+  const [mobileInput, setMobileInput] = useState("")
   const [tracking, setTracking] = useState<TrackingPayload | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [destinationPosition, setDestinationPosition] = useState<LatLng | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  // Re-evaluates GPS staleness on a timer, not just when a new Firebase push
+  // arrives - otherwise a rider whose phone goes dark would stay stuck
+  // showing "LIVE" forever, since nothing would ever re-trigger the check.
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
-    const timer = setTimeout(() => setDestinationPosition(null), 0)
-    return () => clearTimeout(timer)
-  }, [orderId])
-
-  useEffect(() => {
-    if (!orderId) {
+    if (!orderId || !mobile) {
       return
     }
 
@@ -87,11 +101,14 @@ function TrackOrderContent() {
       setError("")
 
       try {
-        const response = await fetch(`/api/orders/${orderId}/status`, { cache: "no-store" })
+        const response = await fetch(
+          `/api/orders/${orderId}/status?mobile=${encodeURIComponent(mobile)}`,
+          { cache: "no-store" },
+        )
         const payload = (await response.json()) as OrderResponse
 
         if (!response.ok || !payload.tracking) {
-          throw new Error(payload.error ?? "Unable to load this order.")
+          throw new Error(payload.error ?? "We couldn't find an order with that ID and phone number.")
         }
 
         if (!cancelled) {
@@ -99,7 +116,12 @@ function TrackOrderContent() {
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Unable to load this order.")
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "We couldn't find an order with that ID and phone number.",
+          )
+          setMobile("")
         }
       } finally {
         if (!cancelled) {
@@ -113,7 +135,7 @@ function TrackOrderContent() {
     return () => {
       cancelled = true
     }
-  }, [orderId])
+  }, [orderId, mobile])
 
   useEffect(() => {
     if (!tracking || tracking.deliveryType !== "LOCAL") {
@@ -146,20 +168,18 @@ function TrackOrderContent() {
     }
   }, [tracking?.deliveryType, tracking?.orderId])
 
-  const isLive = tracking?.liveLocation?.isOnline !== false && tracking?.liveLocation != null
-
-  const riderPosition = tracking?.liveLocation
-    ? { lat: tracking.liveLocation.latitude, lng: tracking.liveLocation.longitude }
-    : null
-
-  const eta = useMemo(() => {
-    if (!tracking) {
-      return null
-    }
-
-    return estimateDeliveryEta({ orderStatus: tracking.orderStatus, riderPosition, destinationPosition })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking?.orderStatus, riderPosition?.lat, riderPosition?.lng, destinationPosition])
+  // "offline" means the tracking session itself has ended - isOnline is only
+  // ever explicitly set to false server-side when the partner completes the
+  // delivery (see setLiveTrackingOffline in lib/orders-server.ts). A rider
+  // whose screen locked, lost signal, or whose tab is merely slow to report
+  // is still "updating", not "offline" - the last known location, route, and
+  // marker all stay exactly as they were either way.
+  const liveStatus: LiveTrackingStatus =
+    !tracking?.liveLocation || tracking.liveLocation.isOnline === false
+      ? "offline"
+      : now - tracking.liveLocation.timestamp < liveFreshThresholdMs
+        ? "live"
+        : "updating"
 
   const showLiveTracking =
     tracking?.deliveryType === "LOCAL" && tracking.orderStatus !== "DELIVERED" && tracking.orderStatus !== "CANCELLED"
@@ -180,6 +200,43 @@ function TrackOrderContent() {
             Browse Menu
           </Link>
         </div>
+      </main>
+    )
+  }
+
+  if (!mobile) {
+    return (
+      <main className="mx-auto flex min-h-[60svh] max-w-md flex-col items-center justify-center gap-3 px-5 py-10 text-center">
+        <h1 className="font-heading text-2xl font-medium">Confirm it&apos;s you</h1>
+        <p className="text-sm text-muted-foreground">
+          Enter the phone number you used when placing order #{orderId} to view live tracking.
+        </p>
+        <form
+          className="mt-2 grid w-full gap-3 text-left"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const trimmed = mobileInput.trim()
+            if (trimmed) {
+              setError("")
+              setMobile(trimmed)
+            }
+          }}
+        >
+          <div className="grid gap-2">
+            <Label htmlFor="mobile">Phone number</Label>
+            <Input
+              id="mobile"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="10-digit mobile number"
+              value={mobileInput}
+              onChange={(event) => setMobileInput(event.target.value)}
+            />
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button type="submit">Track order</Button>
+        </form>
       </main>
     )
   }
@@ -211,7 +268,7 @@ function TrackOrderContent() {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium tracking-wide text-muted-foreground">ORDER #{tracking.orderId}</p>
                 {tracking.deliveryType === "LOCAL" && tracking.orderStatus === "OUT_FOR_DELIVERY" ? (
-                  <LiveBadge live={isLive} />
+                  <LiveBadge status={liveStatus} />
                 ) : null}
               </div>
               <h2 className="font-heading text-2xl font-medium leading-snug sm:text-3xl">
@@ -247,12 +304,11 @@ function TrackOrderContent() {
               apiKey={googleMapsApiKey}
               riderLocation={tracking.liveLocation}
               destinationAddress={tracking.address}
-              isLive={isLive}
+              liveStatus={liveStatus}
+              now={now}
               statusLabel={orderStatusLabels[tracking.orderStatus]}
               riderName={tracking.deliveryPartner?.name}
               riderPhone={tracking.deliveryPartner?.phone}
-              eta={eta}
-              onDestinationResolved={setDestinationPosition}
               className="order-3 h-[26rem] w-full sm:h-[32rem] lg:sticky lg:top-20 lg:order-none lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:h-[calc(100svh-7rem)] lg:max-h-[42rem]"
             />
           ) : tracking.deliveryType === "LOCAL" && tracking.orderStatus === "DELIVERED" ? (

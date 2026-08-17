@@ -21,12 +21,12 @@ export function HeaderCartLink({ transparentHeader = false }: { transparentHeade
     <Link
       href="/cart"
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+        "inline-flex size-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
         transparentHeader && "text-[#3a170a] hover:bg-[#5f2b12]/10"
       )}
       aria-label={`Cart with ${itemCount} items`}
     >
-      <span className="relative inline-flex size-6 items-center justify-center">
+      <span className="relative inline-flex size-5 items-center justify-center">
         <ShoppingCart className="size-5" />
         {itemCount > 0 ? (
           <span className="absolute -right-2 -top-2 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">

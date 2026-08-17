@@ -1,6 +1,10 @@
 import type { Product, ProductSizeVariant } from "@/types/catalogue"
 
-const sharedImage = "/images/tirunelveli-ghee-halwa.png"
+// Neutral fallback for any product without its own photo yet. Do NOT point
+// this at a specific product's real photo (e.g. the ghee halwa image) - that
+// previously caused every unlabeled product (like Karasev) to silently show
+// the ghee halwa photo instead of a placeholder.
+const sharedImage = "/images/lala-sweets-product-placeholder.svg"
 
 function makeSizeVariants(basePriceRupees: number): ProductSizeVariant[] {
   return [
@@ -82,6 +86,7 @@ export const catalogueProducts: Product[] = [
     source_name: "Tirunelveli Ghee Halwa",
     display_name: "Tirunelveli Ghee Halwa",
     slug: "tirunelveli-ghee-halwa",
+    image: "/images/tirunelveli-ghee-halwa.png",
     source_category: "Sweets",
     normalized_category: "Sweets",
     short_description: "Signature Nellai ghee halwa made with wheat, sugar and ghee.",
@@ -99,6 +104,7 @@ export const catalogueProducts: Product[] = [
     source_name: "Laddu",
     display_name: "Laddu",
     slug: "laddu",
+    image: "/images/products/Laddu.png",
     source_category: "Sweets",
     normalized_category: "Sweets",
     short_description: "Traditional Indian sweet for celebrations and gifting.",
@@ -115,6 +121,7 @@ export const catalogueProducts: Product[] = [
     source_name: "Jangerry",
     display_name: "Jangerry",
     slug: "jangerry",
+    image: "/images/products/Jangerry.png",
     source_category: "Sweets",
     normalized_category: "Sweets",
     short_description: "Classic South Indian sweet with a festive finish.",
@@ -131,6 +138,7 @@ export const catalogueProducts: Product[] = [
     source_name: "Mysorepaak",
     display_name: "Mysorepaak",
     slug: "mysorepaak",
+    image: "/images/products/Mysorepaak.png",
     source_category: "Sweets",
     normalized_category: "Sweets",
     short_description: "Rich traditional sweet prepared for gifting and everyday indulgence.",
@@ -147,6 +155,7 @@ export const catalogueProducts: Product[] = [
     source_name: "Badhusha",
     display_name: "Badhusha",
     slug: "badhusha",
+    image: "/images/products/Badhusha.png",
     source_category: "Sweets",
     normalized_category: "Sweets",
     short_description: "Traditional layered sweet with a celebratory character.",
@@ -163,6 +172,7 @@ export const catalogueProducts: Product[] = [
     source_name: "Mixture",
     display_name: "Mixture",
     slug: "mixture",
+    image: "/images/products/Mixture.png",
     source_category: "Savouries",
     normalized_category: "Savouries",
     short_description: "Traditional savoury snack for everyday sharing.",
@@ -179,6 +189,7 @@ export const catalogueProducts: Product[] = [
     source_name: "Special Mixture",
     display_name: "Special Mixture",
     slug: "special-mixture",
+    image: "/images/products/Special-Mixture.png",
     source_category: "Savouries",
     normalized_category: "Savouries",
     short_description: "A special savoury mix from the Lala Sweets menu.",
@@ -197,6 +208,7 @@ export const catalogueProducts: Product[] = [
     slug: "karasev",
     source_category: "Savouries",
     normalized_category: "Savouries",
+    image: "/images/products/Karasev.png",
     short_description: "Traditional crisp savoury with a South Indian profile.",
     long_description: "A savoury item listed on the public Lala Sweets menu. Current public menu pricing has been carried into the central product data.",
     food_type: "vegetarian",

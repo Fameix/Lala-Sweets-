@@ -14,7 +14,11 @@ export function AIAssistantLauncher() {
     return null
   }
 
-  if (pathname === "/custom-cake") {
+  // /custom-cake has its own full-screen flow, and /delivery/[partnerId] is
+  // the delivery-partner sign-in + tracking view - its "Continue" button sits
+  // in the same fixed bottom-right corner as this launcher on short/mobile
+  // screens, so the floating button can intercept taps meant for sign-in.
+  if (pathname === "/custom-cake" || pathname?.startsWith("/delivery")) {
     return null
   }
 

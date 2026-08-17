@@ -5,6 +5,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { getEnv } from "@/lib/env"
+import { computeAuthoritativeOrder } from "@/lib/order-pricing"
 import { cartLineItemSchema, checkoutCustomerSchema } from "@/lib/order-schema"
 import { createOrderRecord, getOrderRecordByRazorpayPaymentId } from "@/lib/orders-server"
 
@@ -13,12 +14,10 @@ const confirmPaymentSchema = z.object({
   razorpay_order_id: z.string().min(1),
   razorpay_payment_id: z.string().min(1),
   razorpay_signature: z.string().min(1),
-  amountPaise: z.number().int().positive(),
   customer: checkoutCustomerSchema,
   products: z.array(cartLineItemSchema).min(1),
   deliveryType: z.enum(["LOCAL", "COURIER"]),
-  subtotalPaise: z.number().int().nonnegative(),
-  deliveryChargePaise: z.number().int().nonnegative(),
+  couponCode: z.string().min(1).optional(),
 })
 
 type RazorpayPayment = {
@@ -47,12 +46,10 @@ export async function POST(request: Request) {
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
-    amountPaise,
     customer,
     products,
     deliveryType,
-    subtotalPaise,
-    deliveryChargePaise,
+    couponCode,
   } = parsed.data
 
   const expectedSignature = crypto
@@ -86,7 +83,7 @@ export async function POST(request: Request) {
     )
   }
 
-  if (payment.order_id !== razorpay_order_id || payment.amount !== amountPaise || payment.status !== "captured") {
+  if (payment.order_id !== razorpay_order_id || payment.status !== "captured") {
     return NextResponse.json({ verified: false, error: "Payment was not captured by Razorpay." }, { status: 400 })
   }
 
@@ -96,14 +93,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ verified: true, order: existingOrder })
   }
 
+  // Recompute what this cart should actually cost right now (same logic the
+  // create-order route used to size the Razorpay payment) and make sure the
+  // amount Razorpay actually captured matches it - catches cases where
+  // prices/coupons/delivery zones changed between create-order and confirm.
+  const authoritative = await computeAuthoritativeOrder({
+    products,
+    pincode: customer.pincode,
+    couponCode,
+  })
+
+  if (payment.amount !== authoritative.grandTotalPaise) {
+    return NextResponse.json(
+      { verified: false, error: "Captured amount does not match the order total. Please contact support." },
+      { status: 400 },
+    )
+  }
+
   try {
     const order = await createOrderRecord({
       orderId,
       customer,
       products,
       deliveryType,
-      subtotalPaise,
-      deliveryChargePaise,
+      subtotalPaise: authoritative.subtotalPaise,
+      deliveryChargePaise: authoritative.deliveryChargePaise,
+      couponCode,
       paymentMethod: "RAZORPAY",
       razorpay: {
         razorpay_payment_id,

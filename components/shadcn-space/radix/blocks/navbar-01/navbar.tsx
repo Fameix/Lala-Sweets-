@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { Phone, Search, TextAlignJustify, UserRound } from "lucide-react"
+import { PackageSearch, Phone, TextAlignJustify, UserRound } from "lucide-react"
 
 import { HeaderCartLink } from "@/components/layout/header-cart-link"
 import { buttonVariants } from "@/components/ui/button"
@@ -25,9 +25,8 @@ const SITE_CONTENT_CLASS = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8"
 
 const primaryLinks = [
   { href: "/", label: "Home" },
-  { href: "/category/sweets", label: "Sweets" },
   { href: "/menu", label: "Menu" },
-  { href: "/track-order", label: "Track Order" },
+  { href: "/legacy", label: "Our Legacy" },
   { href: "/about", label: "Our Story" },
   { href: "/contact", label: "Contact" },
 ]
@@ -66,8 +65,7 @@ export function Navbar({ transparent = false }: { transparent?: boolean }) {
 
       <header
         className={cn(
-          "top-0",
-          transparent ? "absolute inset-x-0 text-[#3a170a]" : "sticky bg-background/95 backdrop-blur",
+          transparent ? "absolute inset-x-0 text-[#3a170a]" : "relative bg-background/95 backdrop-blur",
         )}
       >
         <div className={cn(SITE_CONTENT_CLASS, "py-3 sm:py-4")}>
@@ -122,26 +120,26 @@ export function Navbar({ transparent = false }: { transparent?: boolean }) {
 
             <div className="flex items-center gap-1.5 sm:gap-2">
               <Link
-                href="/search"
-                className={cn(
-                  "inline-flex size-8 items-center justify-center rounded-full text-[#3a170a] transition-colors hover:bg-[#fff7df]/40 hover:text-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                  "hidden sm:inline-flex",
-                  !transparent && "text-foreground hover:bg-muted",
-                )}
-                aria-label="Search"
-              >
-                <Search className="size-4" />
-              </Link>
-              <Link
                 href="/account"
                 className={cn(
-                  "inline-flex size-8 items-center justify-center rounded-full text-[#3a170a] transition-colors hover:bg-[#fff7df]/40 hover:text-[#310898] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  "inline-flex size-9 items-center justify-center rounded-full text-[#3a170a] transition-colors hover:bg-[#fff7df]/40 hover:text-[#310898] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                   "hidden sm:inline-flex",
                   transparent && "hover:bg-[#fff7df]/40",
                 )}
                 aria-label="Account"
               >
-                <UserRound className="size-4" />
+                <UserRound className="size-5" />
+              </Link>
+              <Link
+                href="/track-order"
+                className={cn(
+                  "inline-flex size-9 items-center justify-center rounded-full text-[#3a170a] transition-colors hover:bg-[#fff7df]/40 hover:text-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  "hidden sm:inline-flex",
+                  !transparent && "text-foreground hover:bg-muted",
+                )}
+                aria-label="Track order"
+              >
+                <PackageSearch className="size-5" />
               </Link>
               <HeaderCartLink transparentHeader={transparent} />
               <Link
@@ -181,6 +179,11 @@ export function Navbar({ transparent = false }: { transparent?: boolean }) {
                       </DropdownMenuItem>
                   ))}
                     <div className="my-1 h-px bg-border/60" />
+                      <DropdownMenuItem>
+                        <Link href="/track-order" className="w-full cursor-pointer rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-primary/10 hover:text-primary" onClick={() => setIsOpen(false)}>
+                          Track Order
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem>
                         <Link href="/account" className="w-full cursor-pointer rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-200 hover:bg-[#310898]/10 hover:text-[#310898]" onClick={() => setIsOpen(false)}>
                           Account

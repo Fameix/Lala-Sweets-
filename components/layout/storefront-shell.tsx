@@ -5,7 +5,7 @@ import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
 import Navbar from "@/components/shadcn-space/radix/blocks/navbar-01/navbar"
 import { ViewCartBar } from "@/components/layout/view-cart-bar"
 import { Separator } from "@/components/ui/separator"
-import { getCategories } from "@/lib/catalogue"
+import { getCategories } from "@/lib/catalogue-server"
 import { cn } from "@/lib/utils"
 
 export const SITE_CONTENT_CLASS = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8"
@@ -17,8 +17,8 @@ const policyLinks = [
   { href: "/delivery-policy", label: "Delivery" },
 ]
 
-export function StorefrontShell({ children, transparentHeader = false }: { children: React.ReactNode; transparentHeader?: boolean }) {
-  const categories = getCategories()
+export async function StorefrontShell({ children, transparentHeader = false }: { children: React.ReactNode; transparentHeader?: boolean }) {
+  const categories = await getCategories()
 
   return (
     <div className="min-h-svh bg-background pb-16 text-foreground md:pb-0">

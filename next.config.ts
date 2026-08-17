@@ -10,7 +10,17 @@ const nextConfig: NextConfig = {
   // LAN). If the terminal logs "Cross origin request detected" when opening
   // the app from a LAN IP such as http://192.168.1.42:3000, add that exact
   // IP to this array.
-  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.9", "192.168.1.20"],
+  allowedDevOrigins: [
+    "127.0.0.1",
+    "localhost",
+    "192.168.1.9",
+    "192.168.1.15",
+    "192.168.1.18",
+    "192.168.1.20",
+    "banana-reservations-side-exposed.trycloudflare.com",
+    "volunteer-issn-conversations-debug.trycloudflare.com",
+    "direct-based-car-downtown.trycloudflare.com",
+  ],
   images: {
     remotePatterns: [
       {

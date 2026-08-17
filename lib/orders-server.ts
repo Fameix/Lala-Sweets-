@@ -3,9 +3,12 @@ import "server-only"
 import type { Firestore } from "firebase-admin/firestore"
 
 import type { CartLineItem } from "@/lib/cart-client"
-import { getDeliveryTypeForPincode, normalizePincode, type DeliveryType } from "@/lib/delivery-config"
+import { incrementCouponUsage, validateCoupon } from "@/lib/coupons-server"
+import { normalizePincode, type DeliveryType } from "@/lib/delivery-config"
+import { resolveAuthoritativeDelivery } from "@/lib/delivery-zones-server"
 import { getFirebaseAdminDatabase, getFirebaseAdminDb } from "@/lib/firebase-admin"
 import { generateOrderId } from "@/lib/order-id"
+import { getProductById } from "@/lib/products-server"
 import type {
   AssignedDeliveryPartner,
   CheckoutCustomer,
@@ -24,6 +27,7 @@ type CreateOrderInput = {
   subtotalPaise: number
   deliveryChargePaise: number
   paymentMethod: "RAZORPAY" | "COD"
+  couponCode?: string | null
   courierTracking?: CourierTrackingDetails | null
   razorpay?: {
     razorpay_payment_id?: string
@@ -50,9 +54,11 @@ type OrderDoc = {
   totals: {
     subtotalPaise: number
     deliveryChargePaise: number
+    discountPaise: number
     grandTotalPaise: number
     totalAmountPaise: number
   }
+  couponCode: string | null
   delivery: {
     type: DeliveryType
     pincode: string
@@ -92,6 +98,11 @@ type LiveLocation = {
   orderId: string
   partnerId?: string
   isOnline?: boolean
+  // Compass heading in degrees (0 = north, clockwise), read from the partner's
+  // device orientation sensor when available. Distinct from the bearing the
+  // customer's map can derive from consecutive GPS points, which only reflects
+  // travel direction and can't show heading while the partner is stationary.
+  heading?: number
 }
 
 const statusToLegacyLabel: Record<OrderStatusCode, string> = {
@@ -110,19 +121,33 @@ function nowIso() {
   return new Date().toISOString()
 }
 
-function toLegacyPaymentStatus(status: PaymentStatusCode) {
-  return status === "PAID" ? "Paid" : "Pending"
+// Tolerant of "+91XXXXXXXXXX", "0XXXXXXXXXX", spaces/dashes, etc. - compares
+// only the last 10 digits so the same physical number always matches
+// regardless of how it was formatted at checkout vs. at tracking lookup.
+export function normalizeMobileForComparison(value: string) {
+  return value.replace(/\D/g, "").slice(-10)
 }
 
-function resolveDeliveryType(customerPincode: string, deliveryType?: DeliveryType) {
-  const normalized = normalizePincode(customerPincode)
-  const derivedType = getDeliveryTypeForPincode(normalized)
+// Items with no matching product/size (e.g. custom cake add-ons that don't
+// map onto a plain size variant) pass through unchanged - there's no
+// canonical price to reconcile against yet.
+async function repriceLineItemsAgainstCatalogue(products: CartLineItem[]) {
+  return Promise.all(
+    products.map(async (item) => {
+      const product = await getProductById(item.productId)
+      const variant = product?.size_variants?.find((candidate) => candidate.label === item.size)
 
-  if (derivedType) {
-    return derivedType
-  }
+      if (!variant || variant.price_paise === null) {
+        return item
+      }
 
-  return deliveryType ?? "COURIER"
+      return { ...item, unitPricePaise: variant.price_paise }
+    }),
+  )
+}
+
+function toLegacyPaymentStatus(status: PaymentStatusCode) {
+  return status === "PAID" ? "Paid" : "Pending"
 }
 
 function makeTrackingKey(orderId: string) {
@@ -162,6 +187,7 @@ function toPublicOrder(doc: OrderDoc): SavedOrder {
     courierTracking: doc.courierTracking ?? null,
     trackingKey: doc.trackingKey,
     totals: doc.totals,
+    couponCode: doc.couponCode ?? null,
     delivery: doc.delivery,
     payment: doc.payment,
   }
@@ -217,9 +243,22 @@ export async function createOrderRecord(input: CreateOrderInput) {
   }
 
   const createdAt = nowIso()
-  const resolvedDeliveryType = resolveDeliveryType(input.customer.pincode, input.deliveryType)
   const normalizedPincode = normalizePincode(input.customer.pincode)
-  const totalAmountPaise = input.subtotalPaise + input.deliveryChargePaise
+
+  // Every price that ends up on the order is recomputed here, never trusted
+  // from the client - the checkout UI's numbers are only a preview. This
+  // makes createOrderRecord safe by construction regardless of what a
+  // caller passes in for products/subtotalPaise/deliveryChargePaise.
+  const repricedProducts = await repriceLineItemsAgainstCatalogue(input.products)
+  const subtotalPaise = repricedProducts.reduce((total, item) => total + item.unitPricePaise * item.quantity, 0)
+
+  const { type: resolvedDeliveryType, chargePaise: resolvedDeliveryChargePaise } = await resolveAuthoritativeDelivery(normalizedPincode)
+
+  const couponResult = input.couponCode ? await validateCoupon(input.couponCode, subtotalPaise) : null
+  const discountPaise = couponResult?.valid ? couponResult.discountPaise : 0
+  const appliedCouponCode = couponResult?.valid ? couponResult.coupon.code : null
+
+  const totalAmountPaise = subtotalPaise + resolvedDeliveryChargePaise - discountPaise
   const paymentStatus: PaymentStatusCode = input.paymentMethod === "RAZORPAY" ? "PAID" : "PENDING"
   const orderStatus: OrderStatusCode = "CONFIRMED"
 
@@ -230,7 +269,7 @@ export async function createOrderRecord(input: CreateOrderInput) {
     customer: input.customer,
     address: input.customer.address,
     pincode: normalizedPincode,
-    products: input.products,
+    products: repricedProducts,
     amount: totalAmountPaise,
     paymentStatus,
     deliveryType: resolvedDeliveryType,
@@ -239,11 +278,13 @@ export async function createOrderRecord(input: CreateOrderInput) {
     courierTracking: input.courierTracking ?? null,
     trackingKey: makeTrackingKey(resolvedOrderId),
     totals: {
-      subtotalPaise: input.subtotalPaise,
-      deliveryChargePaise: input.deliveryChargePaise,
+      subtotalPaise,
+      deliveryChargePaise: resolvedDeliveryChargePaise,
+      discountPaise,
       grandTotalPaise: totalAmountPaise,
       totalAmountPaise,
     },
+    couponCode: appliedCouponCode,
     delivery: {
       type: resolvedDeliveryType,
       pincode: normalizedPincode,
@@ -275,18 +316,34 @@ export async function createOrderRecord(input: CreateOrderInput) {
     ],
   }
 
-  await db.runTransaction(async (transaction) => {
+  const wasCreated = await db.runTransaction(async (transaction) => {
     const current = await transaction.get(orderRef)
     if (current.exists) {
-      return
+      return false
     }
 
     transaction.set(orderRef, orderDoc)
+    return true
   })
+
+  if (wasCreated && appliedCouponCode) {
+    await incrementCouponUsage(appliedCouponCode)
+  }
 
   await persistStatusHistory(resolvedOrderId, orderStatus, "Order created.")
 
   return toPublicOrder(orderDoc)
+}
+
+export async function listOrders(options: { status?: OrderStatusCode; limit?: number } = {}) {
+  const db = getFirebaseAdminDb()
+  // Filtering by status in-memory (rather than a Firestore .where() alongside
+  // .orderBy("createdAt")) avoids requiring a composite index for what is, at
+  // this order volume, a small in-memory filter.
+  const snapshot = await ordersCollection(db).orderBy("createdAt", "desc").limit(options.limit ?? 200).get()
+  const orders = snapshot.docs.map((doc) => toPublicOrder(doc.data() as OrderDoc))
+
+  return options.status ? orders.filter((order) => order.orderStatus === options.status) : orders
 }
 
 export async function getOrderRecordByRazorpayPaymentId(paymentId: string) {
@@ -305,10 +362,14 @@ export async function getOrderRecordByOrderId(orderId: string) {
   return order ? toPublicOrder(order) : null
 }
 
-export async function getCustomerTrackingRecord(orderId: string) {
+export async function getCustomerTrackingRecord(orderId: string, mobile: string) {
   const order = await readOrderDoc(orderId)
 
   if (!order) {
+    return null
+  }
+
+  if (!mobile || normalizeMobileForComparison(order.customer.mobile) !== normalizeMobileForComparison(mobile)) {
     return null
   }
 
@@ -444,6 +505,16 @@ export async function updateLiveLocation(orderId: string, location: Omit<LiveLoc
 export async function getLiveLocation(orderId: string) {
   const snapshot = await liveTrackingRef(orderId).get()
   return snapshot.exists() ? (snapshot.val() as LiveLocation) : null
+}
+
+export async function getLiveLocationForCustomer(orderId: string, mobile: string) {
+  const order = await readOrderDoc(orderId)
+
+  if (!order || !mobile || normalizeMobileForComparison(order.customer.mobile) !== normalizeMobileForComparison(mobile)) {
+    return null
+  }
+
+  return getLiveLocation(orderId)
 }
 
 export async function setLiveTrackingOffline(orderId: string) {

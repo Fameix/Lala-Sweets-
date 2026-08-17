@@ -3,7 +3,7 @@ import { ProductCard } from "@/components/commerce/product-card"
 import { StorefrontShell } from "@/components/layout/storefront-shell"
 import { SITE_CONTENT_CLASS } from "@/components/layout/storefront-shell"
 import { Input } from "@/components/ui/input"
-import { searchProducts } from "@/lib/catalogue"
+import { searchProducts } from "@/lib/catalogue-server"
 import { cn } from "@/lib/utils"
 
 export default function SearchPage({
@@ -21,7 +21,7 @@ export default function SearchPage({
 async function SearchContent({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const params = await searchParams
   const query = params.q ?? ""
-  const products = searchProducts(query)
+  const products = await searchProducts(query)
 
   return (
     <main className={cn(SITE_CONTENT_CLASS, "py-8")}>

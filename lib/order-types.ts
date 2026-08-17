@@ -55,9 +55,11 @@ export type SavedOrder = {
   totals: {
     subtotalPaise: number
     deliveryChargePaise: number
+    discountPaise: number
     grandTotalPaise: number
     totalAmountPaise: number
   }
+  couponCode?: string | null
   delivery: {
     type: DeliveryType
     pincode: string

@@ -2,22 +2,24 @@ import { notFound } from "next/navigation"
 
 import { ProductCard } from "@/components/commerce/product-card"
 import { StorefrontShell } from "@/components/layout/storefront-shell"
-import { getCategories, getProductsByCategory } from "@/lib/catalogue"
+import { getCategories, getProductsByCategory } from "@/lib/catalogue-server"
 
-export function generateStaticParams() {
-  return getCategories().map((category) => ({ slug: category.slug }))
+export async function generateStaticParams() {
+  const categories = await getCategories()
+  return categories.map((category) => ({ slug: category.slug }))
 }
 
 export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
 
-  const category = getCategories().find((item) => item.slug === slug)
+  const categories = await getCategories()
+  const category = categories.find((item) => item.slug === slug)
 
   if (!category) {
     notFound()
   }
 
-  const products = getProductsByCategory(slug)
+  const products = await getProductsByCategory(slug)
 
   return (
     <StorefrontShell>

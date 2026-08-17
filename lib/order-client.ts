@@ -16,6 +16,7 @@ type CreateOrderPayload = {
   deliveryType: DeliveryType
   subtotalPaise: number
   deliveryChargePaise: number
+  couponCode?: string
   paymentMethod: "COD"
 }
 
@@ -65,6 +66,7 @@ export function createCodOrder({
   deliveryType,
   subtotalPaise,
   deliveryChargePaise,
+  couponCode,
 }: {
   orderId?: string
   customer: CheckoutCustomer
@@ -72,6 +74,7 @@ export function createCodOrder({
   deliveryType: DeliveryType
   subtotalPaise: number
   deliveryChargePaise: number
+  couponCode?: string
 }) {
   return createOrderOnServer({
     orderId,
@@ -80,6 +83,7 @@ export function createCodOrder({
     deliveryType,
     subtotalPaise,
     deliveryChargePaise,
+    couponCode,
     paymentMethod: "COD",
   })
 }

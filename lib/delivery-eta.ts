@@ -1,7 +1,7 @@
-import type { DeliveryType, OrderStatusCode } from "@/lib/order-types"
+import type { DeliveryType } from "@/lib/order-types"
 
 export type EtaResult = {
-  /** Minutes remaining, rounded to the nearest 5. */
+  /** Minutes remaining, rounded to the nearest whole minute. */
   minutes: number
   /** "Arriving in 18 min" */
   relativeLabel: string
@@ -11,26 +11,7 @@ export type EtaResult = {
   distanceKm: number
 } | null
 
-const averageLocalDeliverySpeedKmh = 20
-const handoffBufferMinutes = 3
-const minEtaMinutes = 5
-const maxReliableEtaMinutes = 90
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180
-}
-
-/** Great-circle distance in kilometres (Haversine formula). */
-function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const earthRadiusKm = 6371
-  const dLat = toRadians(b.lat - a.lat)
-  const dLng = toRadians(b.lng - a.lng)
-  const lat1 = toRadians(a.lat)
-  const lat2 = toRadians(b.lat)
-
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
-  return 2 * earthRadiusKm * Math.asin(Math.sqrt(h))
-}
+const minEtaMinutes = 1
 
 function formatClockLabel(target: Date) {
   const now = new Date()
@@ -40,43 +21,31 @@ function formatClockLabel(target: Date) {
 }
 
 /**
- * Estimates delivery arrival for a LOCAL order that is OUT_FOR_DELIVERY,
- * using the rider's real current GPS position and the customer's real
- * geocoded destination - straight-line distance at an assumed average local
- * delivery speed, plus a small handoff buffer. Returns null (no ETA shown)
- * whenever real location/destination data isn't available yet, or the
- * order hasn't reached OUT_FOR_DELIVERY - callers should show a neutral
- * fallback message instead of inventing a number.
+ * Formats a real road-following route's distance/duration (from the Google
+ * Maps Routes API) into the ETA display shape. Unlike a straight-line
+ * estimate, this is only ever built from an actual route response - callers
+ * should show "ETA temporarily unavailable" instead of calling this when the
+ * route request fails, rather than falling back to a guessed number.
  */
-export function estimateDeliveryEta({
-  orderStatus,
-  riderPosition,
-  destinationPosition,
+export function formatRouteEta({
+  distanceMeters,
+  durationSeconds,
 }: {
-  orderStatus: OrderStatusCode
-  riderPosition: { lat: number; lng: number } | null
-  destinationPosition: { lat: number; lng: number } | null
+  distanceMeters: number
+  durationSeconds: number
 }): EtaResult {
-  if (orderStatus !== "OUT_FOR_DELIVERY" || !riderPosition || !destinationPosition) {
+  if (!Number.isFinite(distanceMeters) || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
     return null
   }
 
-  const distance = distanceKm(riderPosition, destinationPosition)
-  const travelMinutes = (distance / averageLocalDeliverySpeedKmh) * 60
-  const rawMinutes = Math.round(travelMinutes + handoffBufferMinutes)
-
-  if (rawMinutes > maxReliableEtaMinutes) {
-    return null
-  }
-
-  const minutes = Math.max(minEtaMinutes, Math.round(rawMinutes / 5) * 5)
-  const arrival = new Date(Date.now() + minutes * 60 * 1000)
+  const minutes = Math.max(minEtaMinutes, Math.round(durationSeconds / 60))
+  const arrival = new Date(Date.now() + durationSeconds * 1000)
 
   return {
     minutes,
     relativeLabel: `Arriving in ${minutes} min`,
     clockLabel: formatClockLabel(arrival),
-    distanceKm: Math.round(distance * 10) / 10,
+    distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
   }
 }
 

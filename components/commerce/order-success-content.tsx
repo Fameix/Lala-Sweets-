@@ -98,7 +98,7 @@ export function OrderSuccessContent({
 
           <div className="grid gap-2 sm:grid-cols-2">
             <Link
-              href={`/track-order?orderId=${encodeURIComponent(order.orderId)}`}
+              href={`/track-order?orderId=${encodeURIComponent(order.orderId)}&mobile=${encodeURIComponent(order.customer.mobile)}`}
               className={cn(buttonVariants({ size: "lg" }), "w-full")}
             >
               Track Order

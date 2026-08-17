@@ -133,7 +133,7 @@ export function OrderDetailsContent({ order }: { order: SavedOrder }) {
         )}
 
         <Link
-          href={`/track-order?orderId=${encodeURIComponent(order.orderId)}`}
+          href={`/track-order?orderId=${encodeURIComponent(order.orderId)}&mobile=${encodeURIComponent(order.customer.mobile)}`}
           className={cn(buttonVariants({ size: "lg" }), "w-full")}
         >
           Track Order

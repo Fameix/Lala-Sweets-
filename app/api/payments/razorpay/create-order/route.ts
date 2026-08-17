@@ -2,18 +2,22 @@ import Razorpay from "razorpay"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
+import { computeAuthoritativeOrder } from "@/lib/order-pricing"
+import { cartLineItemSchema } from "@/lib/order-schema"
 import { getEnv } from "@/lib/env"
 
 const createOrderSchema = z.object({
-  amountPaise: z.number().int().positive(),
   orderId: z.string().min(1),
+  products: z.array(cartLineItemSchema).min(1),
+  pincode: z.string().min(1),
+  couponCode: z.string().min(1).optional(),
 })
 
 export async function POST(request: Request) {
   const parsed = createOrderSchema.safeParse(await request.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payment amount." }, { status: 400 })
+    return NextResponse.json({ error: "Invalid payment request." }, { status: 400 })
   }
 
   const env = getEnv()
@@ -24,6 +28,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Razorpay is not configured." }, { status: 500 })
   }
 
+  // The amount charged is computed here from the real catalogue/delivery
+  // zones/coupon config - never from a client-submitted amountPaise - so a
+  // manipulated cart total can't result in an underpriced Razorpay charge.
+  const authoritative = await computeAuthoritativeOrder({
+    products: parsed.data.products,
+    pincode: parsed.data.pincode,
+    couponCode: parsed.data.couponCode,
+  })
+
+  if (authoritative.grandTotalPaise <= 0) {
+    return NextResponse.json({ error: "Order total must be greater than zero." }, { status: 400 })
+  }
+
   const razorpay = new Razorpay({
     key_id: keyId,
     key_secret: keySecret,
@@ -32,7 +49,7 @@ export async function POST(request: Request) {
   let order
   try {
     order = await razorpay.orders.create({
-      amount: parsed.data.amountPaise,
+      amount: authoritative.grandTotalPaise,
       currency: "INR",
       receipt: `lala_${parsed.data.orderId}`,
     })

@@ -21,17 +21,34 @@ export function StatusBadge({ status, className }: { status: OrderStatusCode; cl
   )
 }
 
-export function LiveBadge({ live = true, className }: { live?: boolean; className?: string }) {
+export type LiveTrackingStatus = "live" | "updating" | "offline"
+
+// "offline" only ever applies once the tracking session has explicitly ended
+// (delivery completed) - a rider whose GPS is merely delayed/stale is
+// "updating", never "offline". See app/track-order/page.tsx.
+const liveStatusConfig: Record<LiveTrackingStatus, { label: string; toneClassName: string; dotClassName: string; pulse: boolean }> = {
+  live: { label: "LIVE", toneClassName: "bg-live text-live-foreground", dotClassName: "bg-live-foreground", pulse: true },
+  updating: {
+    label: "UPDATING",
+    toneClassName: "bg-warning text-warning-foreground",
+    dotClassName: "bg-warning-foreground",
+    pulse: true,
+  },
+  offline: {
+    label: "Offline",
+    toneClassName: "bg-secondary text-secondary-foreground",
+    dotClassName: "bg-muted-foreground",
+    pulse: false,
+  },
+}
+
+export function LiveBadge({ status = "live", className }: { status?: LiveTrackingStatus; className?: string }) {
+  const config = liveStatusConfig[status]
+
   return (
-    <Badge
-      className={cn(
-        live ? "bg-live text-live-foreground" : "bg-secondary text-secondary-foreground",
-        "gap-1.5 border-transparent shadow-sm",
-        className,
-      )}
-    >
-      <span className={cn("size-1.5 rounded-full", live ? "animate-pulse bg-live-foreground" : "bg-muted-foreground")} />
-      {live ? "LIVE" : "Offline"}
+    <Badge className={cn(config.toneClassName, "gap-1.5 border-transparent shadow-sm", className)}>
+      <span className={cn("size-1.5 rounded-full", config.pulse && "animate-pulse", config.dotClassName)} />
+      {config.label}
     </Badge>
   )
 }

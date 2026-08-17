@@ -9,7 +9,7 @@ import { StorefrontShell } from "@/components/layout/storefront-shell"
 import { SITE_CONTENT_CLASS } from "@/components/layout/storefront-shell"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { getCategories, getProductBySlug, getProducts } from "@/lib/catalogue"
+import { getCategories, getProductBySlug, getProducts } from "@/lib/catalogue-server"
 import { cn } from "@/lib/utils"
 
 const whatsappHref = "https://wa.me/918220266077?text=Vanakkam%2C%20I%20would%20like%20to%20enquire%20about%20Lala%20Sweets."
@@ -20,16 +20,18 @@ const legacyPoints = [
   { icon: ShieldCheck, title: "Generational Craft", text: "Recipes and sweet-making discipline passed through generations." },
 ]
 
-export default function HomePage() {
-  const products = getProducts()
-  const categories = getCategories()
-  const signatureHalwa = getProductBySlug("tirunelveli-ghee-halwa")
+export default async function HomePage() {
+  const [products, categories, signatureHalwa] = await Promise.all([
+    getProducts(),
+    getCategories(),
+    getProductBySlug("tirunelveli-ghee-halwa"),
+  ])
   const featuredProducts = products.filter((product) => product.slug !== "tirunelveli-ghee-halwa").slice(0, 6)
 
   return (
     <StorefrontShell transparentHeader>
       <main>
-        <section className="relative min-h-[560px] overflow-hidden border-b border-border bg-primary text-[#3a170a] sm:min-h-[620px] lg:min-h-[640px]">
+        <section className="relative min-h-svh overflow-hidden border-b border-border bg-primary text-[#3a170a]">
           <Image
             src="/images/lala-sweets-storefront-banner.png"
             alt="Illustrated Sri Lakshmivilas Purathana Lala Sweets storefront"
@@ -39,7 +41,7 @@ export default function HomePage() {
             className="object-cover object-[70%_center] sm:object-[64%_center]"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-[#f8e1aa]/90 via-[#f4d99c]/52 to-transparent sm:from-[#f8e1aa]/78 sm:via-[#f4d99c]/28" />
-          <div className={cn(SITE_CONTENT_CLASS, "relative flex min-h-[560px] items-center py-20 sm:min-h-[620px] lg:min-h-[640px]")}>
+          <div className={cn(SITE_CONTENT_CLASS, "relative flex min-h-svh items-center py-20")}>
             <div className="max-w-xl">
               <p className="font-heading text-[10px] font-bold uppercase tracking-[0.34em] text-[#a95c12] sm:text-xs">
                 The First Halwa of Tirunelveli, Since 1882

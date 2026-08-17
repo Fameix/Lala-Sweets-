@@ -3,22 +3,25 @@
 import * as React from "react"
 import {
   BadgePercent,
+  Bell,
   BarChart3,
-  Boxes,
   ClipboardList,
   FolderTree,
+  LineChart,
+  MapPinned,
   Package,
+  Radio,
   Settings2,
+  Star,
   Truck,
   Users,
-  WalletCards,
   Warehouse,
+  WalletCards,
 } from "lucide-react"
 
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
+import { NavGroup } from "@/components/nav-group"
 import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
+import { SidebarBrand } from "@/components/sidebar-brand"
 import {
   Sidebar,
   SidebarContent,
@@ -33,79 +36,72 @@ const data = {
     email: "Super Admin",
     avatar: "/images/lala-sweets-header-logo-transparent.png",
   },
-  teams: [
+  groups: [
     {
-      name: "Sri Lakshmivilas",
-      logo: "/images/lala-sweets-header-logo-transparent.png",
-      plan: "Purathana Lala Sweets",
-    },
-  ],
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/admin",
-      icon: <BarChart3 />,
-      isActive: true,
+      title: "Main",
       items: [
-        { title: "Overview", url: "/admin" },
-        { title: "Reports", url: "/admin/reports" },
+        { title: "Dashboard", url: "/admin", icon: <BarChart3 /> },
+        { title: "Orders", url: "/admin/orders", icon: <ClipboardList /> },
       ],
     },
     {
-      title: "Orders",
-      url: "/admin/orders",
-      icon: <ClipboardList />,
+      title: "Catalog",
       items: [
-        { title: "All Orders", url: "/admin/orders" },
-        { title: "Delivery Slots", url: "/admin/delivery-slots" },
-        { title: "Delivery Zones", url: "/admin/delivery-zones" },
+        { title: "Products", url: "/admin/products", icon: <Package /> },
+        { title: "Categories", url: "/admin/categories", icon: <FolderTree /> },
+        { title: "Inventory", url: "/admin/inventory", icon: <Warehouse /> },
+        { title: "Offers & Coupons", url: "/admin/coupons", icon: <BadgePercent /> },
       ],
     },
     {
-      title: "Products",
-      url: "/admin/products",
-      icon: <Package />,
+      title: "Delivery",
       items: [
-        { title: "All Products", url: "/admin/products" },
-        { title: "New Product", url: "/admin/products/new" },
-        { title: "Catalogue Review", url: "/admin/catalogue-review" },
-        { title: "Categories", url: "/admin/categories" },
+        { title: "Delivery Partners", url: "/admin/delivery-partners", icon: <Truck /> },
+        { title: "Live Deliveries", url: "/admin/live-deliveries", icon: <Radio /> },
+        { title: "Delivery Zones", url: "/admin/delivery-zones", icon: <MapPinned /> },
       ],
     },
     {
       title: "Customers",
-      url: "/admin/customers",
-      icon: <Users />,
       items: [
-        { title: "Customer List", url: "/admin/customers" },
-        { title: "Reviews", url: "/admin/reviews" },
-        { title: "Custom Cakes", url: "/admin/custom-cakes" },
+        { title: "Customers", url: "/admin/customers", icon: <Users /> },
+        { title: "Reviews", url: "/admin/reviews", icon: <Star /> },
+      ],
+    },
+    {
+      title: "Payments",
+      items: [{ title: "Payments", url: "/admin/payments", icon: <WalletCards /> }],
+    },
+    {
+      title: "Insights",
+      items: [{ title: "Analytics", url: "/admin/analytics", icon: <LineChart /> }],
+    },
+    {
+      title: "System",
+      items: [
+        { title: "Notifications", url: "/admin/notifications", icon: <Bell /> },
+        { title: "Settings", url: "/admin/settings", icon: <Settings2 /> },
       ],
     },
   ],
-  projects: [
-    { name: "Inventory", url: "/admin/inventory", icon: <Warehouse /> },
-    { name: "Couriers", url: "/admin/delivery-slots", icon: <Boxes /> },
-    { name: "Delivery Partners", url: "/admin/delivery-partners", icon: <Truck /> },
-    { name: "Offers & Coupons", url: "/admin/coupons", icon: <BadgePercent /> },
-    { name: "Payments", url: "/admin/settings", icon: <WalletCards /> },
-    { name: "Settings", url: "/admin/settings", icon: <Settings2 /> },
-    { name: "Categories", url: "/admin/categories", icon: <FolderTree /> },
-  ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  adminEmail,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { adminEmail?: string }) {
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <SidebarBrand />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        {data.groups.map((group) => (
+          <NavGroup key={group.title} title={group.title} items={group.items} />
+        ))}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={{ ...data.user, email: adminEmail || data.user.email }} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

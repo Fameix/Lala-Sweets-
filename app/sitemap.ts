@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next"
 
-import { getCategories, getProducts } from "@/lib/catalogue"
+import { getCategories, getProducts } from "@/lib/catalogue-server"
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://www.lalasweets.in"
   const staticRoutes = ["", "/about", "/menu", "/contact", "/search"]
-  const categoryRoutes = getCategories().map((category) => `/category/${category.slug}`)
-  const productRoutes = getProducts().map((product) => `/product/${product.slug}`)
+  const [categories, products] = await Promise.all([getCategories(), getProducts()])
+  const categoryRoutes = categories.map((category) => `/category/${category.slug}`)
+  const productRoutes = products.map((product) => `/product/${product.slug}`)
 
   return [...staticRoutes, ...categoryRoutes, ...productRoutes].map((route) => ({
     url: `${baseUrl}${route}`,

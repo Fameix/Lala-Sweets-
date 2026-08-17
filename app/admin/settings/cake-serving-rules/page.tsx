@@ -6,7 +6,7 @@ export default function AdminCakeServingRulesPage() {
   const rules = getActiveCakeServingRules()
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
+    <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
       <AdminPlaceholder title="Cake Serving Rules" description="Admin-editable serving rules are ready for Supabase persistence. Current local fallback rules are shown below." />
       <Card className="mt-6">
         <CardHeader>

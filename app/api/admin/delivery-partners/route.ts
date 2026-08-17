@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 
-import { requireAdminPreview } from "@/lib/delivery-auth"
+import { requireAdminActor } from "@/lib/delivery-auth"
 import { listDeliveryPartners, upsertDeliveryPartner } from "@/lib/orders-server"
 
 const upsertPartnerSchema = z.object({
@@ -12,9 +12,9 @@ const upsertPartnerSchema = z.object({
   active: z.boolean(),
 })
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    requireAdminPreview()
+    await requireAdminActor(request)
     const partners = await listDeliveryPartners()
     return NextResponse.json({ partners })
   } catch (error) {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    requireAdminPreview()
+    await requireAdminActor(request)
     const partner = await upsertDeliveryPartner(parsed.data)
     return NextResponse.json({ partner })
   } catch (error) {

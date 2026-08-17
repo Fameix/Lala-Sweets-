@@ -18,10 +18,15 @@ const updateOrderStatusSchema = z.object({
   ]),
 })
 
-export async function GET(_request: Request, context: { params: Promise<{ orderId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await context.params
 
   try {
+    // Full order detail includes customer name/address/mobile - only admins
+    // should be able to look this up by order ID. Customers get a
+    // phone-verified subset via GET /api/orders/[orderId]/status instead.
+    await requireAdminActor(request)
+
     const order = await getOrderRecordByOrderId(orderId)
 
     if (!order) {
@@ -30,6 +35,10 @@ export async function GET(_request: Request, context: { params: Promise<{ orderI
 
     return NextResponse.json({ order })
   } catch (error) {
+    if (error instanceof Response) {
+      return error
+    }
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to load order." },
       { status: 500 },

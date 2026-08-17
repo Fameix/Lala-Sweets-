@@ -1,15 +1,18 @@
 "use client"
 
-import { use, useEffect, useState } from "react"
+import { use, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 
+import { Copy, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { adminFetch } from "@/lib/admin-fetch"
 import { orderStatusLabels } from "@/lib/order-status-labels"
 import type { DeliveryPartner, OrderStatusCode, SavedOrder } from "@/lib/order-types"
+import { buildPublicUrl } from "@/lib/public-url"
 
 function formatPrice(paise: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -29,13 +32,14 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [assigning, setAssigning] = useState(false)
   const [advancing, setAdvancing] = useState(false)
   const [error, setError] = useState("")
+  const [copyMessage, setCopyMessage] = useState("")
 
   async function loadOrder() {
     setLoading(true)
     setError("")
 
     try {
-      const response = await fetch(`/api/orders/${orderId}`, { cache: "no-store" })
+      const response = await adminFetch(`/api/orders/${orderId}`, { cache: "no-store" })
       const payload = (await response.json()) as { order?: SavedOrder; error?: string }
 
       if (!response.ok || !payload.order) {
@@ -52,7 +56,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   async function loadPartners() {
     try {
-      const response = await fetch("/api/admin/delivery-partners", { cache: "no-store" })
+      const response = await adminFetch("/api/admin/delivery-partners", { cache: "no-store" })
       const payload = (await response.json()) as { partners?: DeliveryPartner[] }
       setPartners(payload.partners?.filter((partner) => partner.active) ?? [])
     } catch {
@@ -69,6 +73,14 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
+  const partnerLink = useMemo(() => {
+    if (!order?.deliveryPartner?.partnerId) {
+      return ""
+    }
+
+    return buildPublicUrl(`/delivery/${encodeURIComponent(order.deliveryPartner.partnerId)}`)
+  }, [order?.deliveryPartner?.partnerId])
+
   async function assignPartner() {
     if (!selectedPartnerId) {
       setError("Choose a delivery partner first.")
@@ -79,7 +91,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     setError("")
 
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}/assign`, {
+      const response = await adminFetch(`/api/orders/${orderId}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ partnerId: selectedPartnerId }),
@@ -103,8 +115,8 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     setError("")
 
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}/status`, {
-        method: "POST",
+      const response = await adminFetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderStatus: nextStatus }),
       })
@@ -124,7 +136,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
         <p className="text-sm text-muted-foreground">Loading order...</p>
       </main>
     )
@@ -132,7 +144,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   if (!order) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-8">
+      <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="font-heading text-3xl font-medium">Order Detail</h1>
         <p className="mt-3 text-sm text-destructive">{error || "Order not found."}</p>
         <Link href="/admin/orders" className="mt-4 inline-block text-sm text-primary underline underline-offset-4">
@@ -144,8 +156,22 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
 
   const canAssign = order.deliveryType === "LOCAL" && order.orderStatus !== "DELIVERED" && order.orderStatus !== "CANCELLED"
 
+  async function copyPartnerLink() {
+    if (!partnerLink) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(partnerLink)
+      setCopyMessage("Link copied.")
+      window.setTimeout(() => setCopyMessage(""), 2000)
+    } catch {
+      setError("Could not copy the link. Please copy it manually.")
+    }
+  }
+
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
+    <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-heading text-3xl font-medium">Order {order.orderId}</h1>
         <Badge variant="outline">{orderStatusLabels[order.orderStatus]}</Badge>
@@ -273,9 +299,39 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
             ) : (
               <p className="text-sm text-muted-foreground">Assignment is not available for this order.</p>
             )}
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          </CardContent>
-        </Card>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            </CardContent>
+          </Card>
+
+          {order.deliveryPartner?.partnerId ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Partner Link</CardTitle>
+                <CardDescription>Use this same link on laptop and mobile to open the delivery partner page.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                <div className="break-all rounded-2xl border border-border bg-muted/40 px-3 py-2 text-sm">
+                  {partnerLink}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={copyPartnerLink}>
+                    <Copy className="size-4" />
+                    Copy Link
+                  </Button>
+                  <a
+                    href={partnerLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-4xl border border-border bg-background px-3 text-sm font-medium hover:bg-muted"
+                  >
+                    <ExternalLink className="size-4" />
+                    Open Link
+                  </a>
+                </div>
+                {copyMessage ? <p className="text-xs text-muted-foreground">{copyMessage}</p> : null}
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
     </main>

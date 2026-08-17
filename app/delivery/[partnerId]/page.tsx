@@ -20,6 +20,69 @@ const requestTimeoutMs = 30000
 type ActiveWatch = { orderId: string; watchId: number }
 type GpsReportStatus = { lastSentAt: number | null; lastError: string | null }
 
+// Browsers only expose navigator.geolocation on a "secure context" - HTTPS,
+// or http://localhost. Opening this page over plain HTTP via a LAN IP (e.g.
+// http://192.168.1.18:3000, the normal way to test on a phone against a dev
+// server) is NOT a secure context, so getCurrentPosition/watchPosition fail
+// immediately with a cryptic "Only secure origins are allowed" message. This
+// gives the delivery partner a clear, actionable reason instead.
+function geolocationBlockedReason(): string | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  if (!navigator.geolocation) {
+    return "This browser does not support GPS location."
+  }
+
+  if (!window.isSecureContext) {
+    return "GPS location requires a secure (https://) connection - it will not work over a plain http:// address (other than localhost). Ask the shop to share an https link, or open this page over HTTPS."
+  }
+
+  return null
+}
+
+// Reads a compass heading (0 = north, clockwise) off a DeviceOrientationEvent.
+// iOS Safari exposes an already-computed compass heading via the
+// non-standard webkitCompassHeading. Everywhere else, the "absolute"
+// deviceorientationabsolute event's alpha is the device's rotation around
+// its z-axis measured counter-clockwise from north, so the compass heading
+// is its complement.
+function extractCompassHeading(event: DeviceOrientationEvent): number | null {
+  const iosEvent = event as DeviceOrientationEvent & { webkitCompassHeading?: number }
+
+  if (typeof iosEvent.webkitCompassHeading === "number" && Number.isFinite(iosEvent.webkitCompassHeading)) {
+    return iosEvent.webkitCompassHeading
+  }
+
+  if (event.absolute && typeof event.alpha === "number" && Number.isFinite(event.alpha)) {
+    return (360 - event.alpha) % 360
+  }
+
+  return null
+}
+
+// iOS 13+ requires an explicit, user-gesture-triggered permission prompt
+// before deviceorientation events carry any data. Other browsers either
+// don't need this or don't expose the API at all, in which case heading
+// capture is simply skipped and the customer map falls back to the
+// GPS-movement-derived bearing.
+async function ensureOrientationPermission(): Promise<boolean> {
+  const OrientationEvent = window.DeviceOrientationEvent as unknown as {
+    requestPermission?: () => Promise<"granted" | "denied">
+  }
+
+  if (typeof OrientationEvent?.requestPermission !== "function") {
+    return true
+  }
+
+  try {
+    return (await OrientationEvent.requestPermission()) === "granted"
+  } catch {
+    return false
+  }
+}
+
 async function fetchWithTimeout(input: string, init: RequestInit = {}, timeoutMs = requestTimeoutMs): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -49,6 +112,10 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
   const [activeWatch, setActiveWatch] = useState<ActiveWatch | null>(null)
   const activeWatchRef = useRef<ActiveWatch | null>(null)
   const [gpsStatus, setGpsStatus] = useState<Record<string, GpsReportStatus>>({})
+  const headingRef = useRef<number | null>(null)
+  const stopHeadingListenerRef = useRef<(() => void) | null>(null)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
+  const [wakeLockActive, setWakeLockActive] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -73,8 +140,101 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
       if (activeWatchRef.current) {
         navigator.geolocation.clearWatch(activeWatchRef.current.watchId)
       }
+      stopHeadingListenerRef.current?.()
+      void wakeLockRef.current?.release()
     }
   }, [])
+
+  // Mobile browsers throttle/suspend background tabs to save battery, which
+  // stops navigator.geolocation.watchPosition from firing once the screen
+  // locks - this is an OS-level limitation, not a bug here. The Screen Wake
+  // Lock API is the only browser-level mitigation: it keeps the screen from
+  // auto-sleeping while a delivery is active. It does NOT survive the
+  // partner manually pressing the power button or switching apps - the
+  // sentinel is released by the browser the instant the tab is hidden, and
+  // there is no way for a plain web page to prevent that or to track in the
+  // background. True background tracking would need a native app.
+  async function requestWakeLock() {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) {
+      return
+    }
+
+    try {
+      const sentinel = await navigator.wakeLock.request("screen")
+      wakeLockRef.current = sentinel
+      setWakeLockActive(true)
+
+      sentinel.addEventListener("release", () => {
+        wakeLockRef.current = null
+        setWakeLockActive(false)
+      })
+    } catch {
+      // Best effort - permission/support issues just mean no wake lock; GPS
+      // watch and visual tracking still work whenever the screen is on.
+      setWakeLockActive(false)
+    }
+  }
+
+  function releaseWakeLock() {
+    void wakeLockRef.current?.release()
+    wakeLockRef.current = null
+    setWakeLockActive(false)
+  }
+
+  // The wake lock sentinel is auto-released whenever the tab is hidden (app
+  // switched, screen manually locked). Re-request it the moment the tab
+  // becomes visible again, as long as a delivery is still being tracked -
+  // otherwise the screen would go back to sleeping on its own timeout the
+  // next time the partner checks the app.
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible" && activeWatchRef.current) {
+        void requestWakeLock()
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [])
+
+  // Starts listening for the phone's compass heading so the customer's map
+  // can show which way the partner is facing even while stationary. Best
+  // effort: silently does nothing if the permission prompt is denied or the
+  // browser doesn't support device orientation - the customer map still
+  // falls back to a movement-derived bearing in that case.
+  async function startHeadingListener() {
+    stopHeadingListenerRef.current?.()
+
+    if (typeof window === "undefined" || !window.DeviceOrientationEvent) {
+      return
+    }
+
+    const permitted = await ensureOrientationPermission()
+    if (!permitted) {
+      return
+    }
+
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      const heading = extractCompassHeading(event)
+      if (heading !== null) {
+        headingRef.current = heading
+      }
+    }
+
+    // "deviceorientationabsolute" gives a world-locked (compass) heading on
+    // Chrome/Android. Safari never fires it, but its plain
+    // "deviceorientation" events carry webkitCompassHeading instead, which
+    // extractCompassHeading() already prefers.
+    const supportsAbsolute = "ondeviceorientationabsolute" in window
+    const eventName = supportsAbsolute ? "deviceorientationabsolute" : "deviceorientation"
+    window.addEventListener(eventName, handleOrientation as EventListener)
+
+    stopHeadingListenerRef.current = () => {
+      window.removeEventListener(eventName, handleOrientation as EventListener)
+      headingRef.current = null
+      stopHeadingListenerRef.current = null
+    }
+  }
 
   const authHeaders = useCallback(
     (key: string): HeadersInit => ({
@@ -170,8 +330,13 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
   // (insecure origin, permission denied, tab reload) - can be retried
   // without re-calling start-delivery or losing the order's current status.
   function beginWatchingPosition(order: SavedOrder) {
-    if (!accessKey || !navigator.geolocation) {
-      setError("This browser does not support GPS location.")
+    if (!accessKey) {
+      return
+    }
+
+    const blockedReason = geolocationBlockedReason()
+    if (blockedReason) {
+      setError(blockedReason)
       return
     }
 
@@ -181,6 +346,8 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
 
     setError("")
     setGpsStatus((current) => ({ ...current, [order.orderId]: { lastSentAt: null, lastError: null } }))
+    void startHeadingListener()
+    void requestWakeLock()
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -194,6 +361,7 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
             accuracy: position.coords.accuracy,
             timestamp: position.timestamp,
             isOnline: true,
+            heading: headingRef.current ?? undefined,
           }),
         })
           .then(async (response) => {
@@ -231,8 +399,9 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
       return
     }
 
-    if (!navigator.geolocation) {
-      setError("This browser does not support GPS location.")
+    const blockedReason = geolocationBlockedReason()
+    if (blockedReason) {
+      setError(blockedReason)
       return
     }
 
@@ -267,6 +436,8 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
     if (activeWatchRef.current && activeWatchRef.current.orderId === order.orderId) {
       navigator.geolocation.clearWatch(activeWatchRef.current.watchId)
       setActiveWatch(null)
+      stopHeadingListenerRef.current?.()
+      releaseWakeLock()
     }
 
     setGpsStatus((current) => {
@@ -346,6 +517,13 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
 
       {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
 
+      {geolocationBlockedReason() ? (
+        <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-foreground">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          {geolocationBlockedReason()}
+        </p>
+      ) : null}
+
       <div className="mt-6 grid gap-4">
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading assigned orders...</p>
@@ -371,7 +549,16 @@ export default function DeliveryPartnerPage({ params }: { params: Promise<{ part
                   {order.customer.mobile}
                 </div>
 
-                {activeWatch?.orderId === order.orderId ? <GpsStatusLine status={gpsStatus[order.orderId]} /> : null}
+                {activeWatch?.orderId === order.orderId ? (
+                  <>
+                    <GpsStatusLine status={gpsStatus[order.orderId]} />
+                    <p className="text-xs text-muted-foreground">
+                      {wakeLockActive
+                        ? "Screen will stay on while you're delivering - keep this tab open."
+                        : "Keep this screen unlocked and this tab open, or location sharing will pause."}
+                    </p>
+                  </>
+                ) : null}
 
                 <a
                   href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address)}`}

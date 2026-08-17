@@ -1,52 +1,32 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
 import {
-  ArrowUpRight,
-  BadgeIndianRupee,
-  Boxes,
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Bell,
   CheckCircle2,
   Clock3,
   IndianRupee,
-  PackageSearch,
+  Radio,
   ShoppingBag,
-  UsersRound,
+  TrendingUp,
 } from "lucide-react"
 
+import { AnalyticsCharts } from "@/components/admin/analytics/analytics-charts"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { getMissingPriceProducts, getNeedsReviewProducts, getProducts } from "@/lib/catalogue"
-import { getOrders, type SavedOrder } from "@/lib/order-client"
-
-const fallbackOrders = [
-  { id: "LS10245", customer: "Gokul K", method: "COD", status: "Pending", delivery: "LOCAL", amount: "INR 620", date: "18 Aug, 02:30 PM" },
-  { id: "LS10244", customer: "Ramesh B", method: "RAZORPAY", status: "Paid", delivery: "COURIER", amount: "INR 1,240", date: "18 Aug, 01:45 PM" },
-  { id: "LS10243", customer: "Priya S", method: "RAZORPAY", status: "Paid", delivery: "LOCAL", amount: "INR 540", date: "18 Aug, 12:15 PM" },
-  { id: "LS10242", customer: "Arun M", method: "COD", status: "Pending", delivery: "COURIER", amount: "INR 760", date: "18 Aug, 11:20 AM" },
-]
-
-const inventory = [
-  { item: "Halwa", quantity: "120 kg", status: "In stock" },
-  { item: "Laddu", quantity: "280 pcs", status: "In stock" },
-  { item: "Mysorepak", quantity: "150 pcs", status: "Low stock" },
-  { item: "Badusha", quantity: "90 pcs", status: "Low stock" },
-]
+import { buttonVariants } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { adminFetch } from "@/lib/admin-fetch"
+import { useOrderAlerts } from "@/components/admin/order-alerts/order-alerts-context"
+import type { CustomerSummary } from "@/lib/customers-server"
+import { orderStatusLabels } from "@/lib/order-status-labels"
+import type { SavedOrder } from "@/lib/order-types"
+import type { Product } from "@/types/catalogue"
+import { cn } from "@/lib/utils"
 
 function formatPrice(paise: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -57,175 +37,294 @@ function formatPrice(paise: number) {
 }
 
 function formatDate(date: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(date))
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
+}
+
+function isToday(iso: string) {
+  const date = new Date(iso)
+  const now = new Date()
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  )
 }
 
 function getOrderValue(order: SavedOrder) {
   return order.totals.totalAmountPaise || order.totals.grandTotalPaise
 }
 
-function toOrderRow(order: SavedOrder) {
-  return {
-    id: order.orderId,
-    customer: order.customer.name,
-    method: order.payment.method,
-    status: order.payment.status,
-    delivery: order.delivery.type,
-    amount: formatPrice(getOrderValue(order)),
-    date: formatDate(order.createdAt),
-  }
-}
-
 export default function AdminPage() {
-  const products = getProducts()
-  const orders = getOrders()
-  const paidOrders = orders.filter((order) => order.payment.status === "Paid")
-  const pendingOrders = orders.filter((order) => order.payment.status === "Pending")
-  const revenue = paidOrders.reduce((total, order) => total + getOrderValue(order), 0)
-  const needsReview = getNeedsReviewProducts().length + getMissingPriceProducts().length
-  const recentOrders = orders.length > 0 ? orders.slice(0, 6).map(toOrderRow) : fallbackOrders
+  const [orders, setOrders] = useState<SavedOrder[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [customers, setCustomers] = useState<CustomerSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const { recentOrders: recentNotifications } = useOrderAlerts()
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadDashboard() {
+      try {
+        const [ordersResponse, productsResponse, customersResponse] = await Promise.all([
+          adminFetch("/api/admin/orders", { cache: "no-store" }),
+          adminFetch("/api/admin/products", { cache: "no-store" }),
+          adminFetch("/api/admin/customers", { cache: "no-store" }),
+        ])
+        const ordersPayload = (await ordersResponse.json()) as { orders?: SavedOrder[] }
+        const productsPayload = (await productsResponse.json()) as { products?: Product[] }
+        const customersPayload = (await customersResponse.json()) as { customers?: CustomerSummary[] }
+
+        if (!cancelled) {
+          setOrders(ordersPayload.orders ?? [])
+          setProducts(productsPayload.products ?? [])
+          setCustomers(customersPayload.customers ?? [])
+        }
+      } catch {
+        if (!cancelled) {
+          setOrders([])
+          setProducts([])
+          setCustomers([])
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadDashboard()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const stats = useMemo(() => {
+    const todayOrders = orders.filter((order) => isToday(order.createdAt))
+    const todayRevenue = todayOrders
+      .filter((order) => order.paymentStatus === "PAID" || order.payment.method === "COD")
+      .reduce((total, order) => total + getOrderValue(order), 0)
+    const pendingOrders = orders.filter((order) =>
+      ["CONFIRMED", "PREPARING", "READY"].includes(order.orderStatus),
+    )
+    const outForDelivery = orders.filter((order) => order.orderStatus === "OUT_FOR_DELIVERY")
+    const delivered = orders.filter((order) => order.orderStatus === "DELIVERED")
+    const lowStock = products.filter((product) => product.stock_status && product.stock_status !== "in-stock")
+
+    return {
+      todayOrders: todayOrders.length,
+      todayRevenue,
+      pendingOrders: pendingOrders.length,
+      outForDelivery: outForDelivery.length,
+      delivered: delivered.length,
+      lowStock: lowStock.length,
+    }
+  }, [orders, products])
+
+  const recentOrders = orders.slice(0, 6)
+
+  const topSellingProducts = useMemo(() => {
+    const quantityByProduct = new Map<string, { name: string; quantity: number }>()
+
+    for (const order of orders) {
+      for (const item of order.products) {
+        const current = quantityByProduct.get(item.productId)
+        quantityByProduct.set(item.productId, {
+          name: current?.name ?? item.productName ?? "Product",
+          quantity: (current?.quantity ?? 0) + item.quantity,
+        })
+      }
+    }
+
+    return Array.from(quantityByProduct.values())
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5)
+  }, [orders])
+
+  const activeDeliveries = orders.filter(
+    (order) => order.orderStatus === "OUT_FOR_DELIVERY" && order.deliveryType === "LOCAL",
+  )
 
   return (
-    <main className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <div className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Monitor orders, catalogue health, revenue, and fulfilment.</p>
+          <h1 className="font-heading text-3xl font-medium">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Live overview of today&apos;s orders, revenue, and fulfilment.
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" render={<Link href="/admin/catalogue-review" />}>
-            <PackageSearch />
-            Catalogue Review
-          </Button>
-          <Button render={<Link href="/admin/orders" />}>
-            <ShoppingBag />
-            Orders
-          </Button>
-        </div>
+        <Link href="/admin/orders" className={cn(buttonVariants({ variant: "outline" }), "gap-2")}>
+          <ShoppingBag className="size-4" />
+          View Orders
+        </Link>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total orders" value={orders.length} description={`${pendingOrders.length} pending`} icon={ShoppingBag} />
-        <StatCard title="Revenue" value={revenue ? formatPrice(revenue) : "INR 0"} description={`${paidOrders.length} paid orders`} icon={IndianRupee} />
-        <StatCard title="Products" value={products.length} description={`${needsReview} need review`} icon={Boxes} />
-        <StatCard title="Customers" value={orders.length || 0} description="Local order records" icon={UsersRound} />
-      </section>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StatCard title="Today's Orders" value={loading ? "—" : stats.todayOrders} icon={ShoppingBag} />
+        <StatCard title="Today's Revenue" value={loading ? "—" : formatPrice(stats.todayRevenue)} icon={IndianRupee} />
+        <StatCard title="Pending Orders" value={loading ? "—" : stats.pendingOrders} icon={Clock3} />
+        <StatCard title="Out for Delivery" value={loading ? "—" : stats.outForDelivery} icon={Radio} />
+        <StatCard title="Delivered" value={loading ? "—" : stats.delivered} icon={CheckCircle2} />
+        <StatCard title="Low Stock" value={loading ? "—" : stats.lowStock} icon={AlertTriangle} tone={stats.lowStock > 0 ? "warning" : "default"} />
+      </div>
 
-      <section className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+      <div className="mt-6 flex items-center justify-between">
+        <h2 className="font-heading text-lg font-medium">Analytics</h2>
+        <Link href="/admin/analytics" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}>
+          <BarChart3 className="size-4" />
+          View full analytics
+        </Link>
+      </div>
+
+      <div className="mt-3">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading analytics...</p>
+        ) : (
+          <AnalyticsCharts orders={orders} customers={customers} compact />
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.6fr_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Recent orders</CardTitle>
-            <CardDescription>Latest checkout activity from the local order store.</CardDescription>
-            <CardAction>
-              <Button variant="outline" size="sm" render={<Link href="/admin/orders" />}>
-                View all
-                <ArrowUpRight />
-              </Button>
-            </CardAction>
+            <CardTitle>Recent Orders</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Delivery</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="hidden lg:table-cell">Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium text-primary">{order.id}</TableCell>
-                    <TableCell>{order.customer}</TableCell>
-                    <TableCell>
-                      <Badge variant={order.status === "Paid" ? "default" : "secondary"}>{order.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{order.delivery}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">{order.amount}</TableCell>
-                    <TableCell className="hidden text-muted-foreground lg:table-cell">{order.date}</TableCell>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="hidden lg:table-cell">Placed</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {recentOrders.length > 0 ? (
+                    recentOrders.map((order) => (
+                      <TableRow key={order.orderId}>
+                        <TableCell className="font-medium text-primary">
+                          <Link href={`/admin/orders/${order.orderId}`}>{order.orderId}</Link>
+                        </TableCell>
+                        <TableCell>{order.customer.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{orderStatusLabels[order.orderStatus]}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{formatPrice(getOrderValue(order))}</TableCell>
+                        <TableCell className="hidden text-muted-foreground lg:table-cell">
+                          {formatDate(order.createdAt)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                        {loading ? "Loading orders..." : "No orders have been placed yet."}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Catalogue health</CardTitle>
-            <CardDescription>Items that need admin attention before publishing.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <HealthRow label="Missing prices" value={getMissingPriceProducts().length} icon={BadgeIndianRupee} />
-            <HealthRow label="Needs review" value={getNeedsReviewProducts().length} icon={PackageSearch} />
-            <HealthRow label="Ready products" value={products.length - needsReview} icon={CheckCircle2} />
-            <Button variant="outline" render={<Link href="/admin/catalogue-review" />}>
-              Review catalogue
-              <ArrowUpRight />
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Inventory</CardTitle>
-            <CardDescription>Current stock snapshot.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="size-4 text-primary" />
+              Top Selling Products
+            </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {inventory.map((item) => (
-              <div key={item.item} className="flex items-center justify-between gap-3 rounded-xl border p-3">
-                <div>
-                  <p className="font-medium">{item.item}</p>
-                  <p className="text-sm text-muted-foreground">{item.quantity}</p>
+            {topSellingProducts.length > 0 ? (
+              topSellingProducts.map((item, index) => (
+                <div key={item.name} className="flex items-center justify-between gap-3 rounded-2xl border border-border p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                      {index + 1}
+                    </span>
+                    <span className="font-medium">{item.name}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{item.quantity} sold</span>
                 </div>
-                <Badge variant={item.status === "In stock" ? "secondary" : "destructive"}>{item.status}</Badge>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No sales data yet.</p>
+            )}
           </CardContent>
         </Card>
+      </div>
 
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Fulfilment</CardTitle>
-            <CardDescription>Delivery mix for recent orders.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Radio className="size-4 text-primary" />
+              Active Deliveries
+            </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <SummaryRow label="Local delivery" value={orders.filter((order) => order.delivery.type === "LOCAL").length} />
-            <SummaryRow label="Courier delivery" value={orders.filter((order) => order.delivery.type === "COURIER").length} />
-            <SummaryRow label="Pending COD" value={pendingOrders.length} />
+            {activeDeliveries.length > 0 ? (
+              <>
+                {activeDeliveries.slice(0, 5).map((order) => (
+                  <div key={order.orderId} className="flex items-center justify-between gap-3 rounded-2xl border border-border p-3">
+                    <div>
+                      <p className="font-medium">{order.orderId}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {order.deliveryPartner?.name ?? "Rider"} • {order.customer.name}
+                      </p>
+                    </div>
+                    <Badge className="bg-live text-live-foreground">Live</Badge>
+                  </div>
+                ))}
+                <Link href="/admin/live-deliveries" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-between")}>
+                  View live map
+                  <ArrowRight className="size-4" />
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No deliveries in progress right now.</p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Next actions</CardTitle>
-            <CardDescription>Common admin workflows.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="size-4 text-primary" />
+              Recent Notifications
+            </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-2">
-            {[
-              { href: "/admin/orders", label: "Process orders" },
-              { href: "/admin/products/new", label: "Add product" },
-              { href: "/admin/inventory", label: "Update inventory" },
-              { href: "/admin/settings", label: "Store settings" },
-            ].map((item) => (
-              <Button key={item.href} variant="outline" className="justify-between" render={<Link href={item.href} />}>
-                {item.label}
-                <ArrowUpRight />
-              </Button>
-            ))}
+          <CardContent className="grid gap-3">
+            {recentNotifications.length > 0 ? (
+              <>
+                {recentNotifications.slice(0, 5).map((event) => (
+                  <div key={event.orderId} className="flex items-center justify-between gap-3 rounded-2xl border border-border p-3 text-sm">
+                    <div>
+                      <p className="font-medium">New order #{event.orderId}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {event.customerName} • {event.itemCount} item{event.itemCount === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <span className="font-medium text-primary">{formatPrice(event.amountPaise)}</span>
+                  </div>
+                ))}
+                <Link href="/admin/notifications" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-between")}>
+                  View all notifications
+                  <ArrowRight className="size-4" />
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No notifications yet this session.</p>
+            )}
           </CardContent>
         </Card>
-      </section>
+      </div>
     </main>
   )
 }
@@ -233,60 +332,25 @@ export default function AdminPage() {
 function StatCard({
   title,
   value,
-  description,
   icon: Icon,
+  tone = "default",
 }: {
   title: string
   value: number | string
-  description: string
   icon: React.ComponentType<{ className?: string }>
+  tone?: "default" | "warning"
 }) {
   return (
     <Card>
       <CardHeader>
-        <CardDescription>{title}</CardDescription>
-        <CardTitle className="font-sans text-2xl font-semibold tabular-nums tracking-tight">{value}</CardTitle>
-        <CardAction>
-          <Icon className="size-4 text-muted-foreground" />
-        </CardAction>
+        <CardTitle className="flex items-center justify-between gap-3 text-base font-medium text-muted-foreground">
+          {title}
+          <Icon className={cn("size-4", tone === "warning" ? "text-warning" : "text-muted-foreground")} />
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="flex items-center gap-1 text-sm text-muted-foreground">
-          <Clock3 className="size-3.5" />
-          {description}
-        </p>
+        <p className="text-3xl font-semibold">{value}</p>
       </CardContent>
     </Card>
-  )
-}
-
-function HealthRow({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string
-  value: number
-  icon: React.ComponentType<{ className?: string }>
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
-      <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-muted">
-          <Icon className="size-4" />
-        </span>
-        <span className="font-medium">{label}</span>
-      </div>
-      <span className="text-lg font-semibold">{value}</span>
-    </div>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="font-semibold">{value}</span>
-    </div>
   )
 }
